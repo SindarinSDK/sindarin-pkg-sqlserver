@@ -72,7 +72,7 @@ FREETDS_INST  := /tmp/freetds-install
 build-libs:
 	@echo "Building FreeTDS from source for $(PLATFORM)..."
 	@if [ ! -d "$(FREETDS_SRC)" ]; then \
-	    git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git $(FREETDS_SRC); \
+	    git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git $(FREETDS_SRC); \
 	fi
 	@cmake -S $(FREETDS_SRC) -B $(FREETDS_BUILD) \
 	    -G Ninja \

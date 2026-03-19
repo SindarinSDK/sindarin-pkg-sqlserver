@@ -41,14 +41,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1.4-linux-x64-v1
+          key: freetds-branch-1_4-linux-x64-v1
 
       - name: Build FreeTDS
         run: |
           if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
             echo "Using cached FreeTDS build"
           else
-            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cmake -S freetds -B freetds/build \
               -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \

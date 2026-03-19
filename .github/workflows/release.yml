@@ -40,14 +40,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1.4-linux-${{ matrix.arch }}-v1
+          key: freetds-branch-1_4-linux-${{ matrix.arch }}-v1
 
       - name: Build FreeTDS
         run: |
           if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
             echo "Using cached FreeTDS build"
           else
-            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cmake -S freetds -B freetds/build \
               -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -99,14 +99,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1.4-darwin-${{ matrix.arch }}-v1
+          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-v1
 
       - name: Build FreeTDS
         run: |
           if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
             echo "Using cached FreeTDS build"
           else
-            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cmake -S freetds -B freetds/build \
               -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -177,14 +177,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1.4-windows-x64-v1
+          key: freetds-branch-1_4-windows-x64-v1
 
       - name: Build FreeTDS
         run: |
           if ((Test-Path "freetds-install/lib") -and (Test-Path "freetds-install/include/sybdb.h")) {
             Write-Host "Using cached FreeTDS build"
           } else {
-            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cmake -S freetds -B freetds/build `
               -G Ninja `
               -DCMAKE_BUILD_TYPE=Release `
