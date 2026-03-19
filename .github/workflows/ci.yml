@@ -64,6 +64,8 @@ jobs:
 
       - name: Package libs
         run: |
+          echo "=== freetds-install/lib contents ==="
+          ls -la freetds-install/lib/ || echo "(no lib dir)"
           mkdir -p libs/linux/lib libs/linux/include
           find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
           cp -r freetds-install/include/* libs/linux/include/
