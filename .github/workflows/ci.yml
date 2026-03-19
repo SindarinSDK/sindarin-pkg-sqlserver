@@ -35,13 +35,13 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build gperf
+          sudo apt-get install -y build-essential cmake ninja-build gperf unixodbc-dev
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-x64-v2
+          key: freetds-branch-1_4-linux-x64-v3
 
       - name: Build FreeTDS
         run: |
