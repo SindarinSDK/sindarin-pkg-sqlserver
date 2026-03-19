@@ -34,7 +34,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
+          sudo apt-get install -y build-essential cmake ninja-build gperf
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
@@ -93,7 +93,7 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          brew install cmake ninja
+          brew install cmake ninja gperf
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
@@ -171,7 +171,7 @@ jobs:
         shell: pwsh
 
       - name: Install build tools
-        run: choco install ninja -y
+        run: choco install ninja gperf -y
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
