@@ -34,13 +34,13 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build gperf unixodbc-dev
+          sudo apt-get install -y build-essential cmake ninja-build gperf unixodbc-dev libkrb5-dev
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-${{ matrix.arch }}-v3
+          key: freetds-branch-1_4-linux-${{ matrix.arch }}-v4
 
       - name: Build FreeTDS
         run: |
@@ -100,7 +100,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-v3
+          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-v4
 
       - name: Build FreeTDS
         run: |
@@ -179,7 +179,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-windows-x64-v3
+          key: freetds-branch-1_4-windows-x64-v4
 
       - name: Build FreeTDS
         run: |
