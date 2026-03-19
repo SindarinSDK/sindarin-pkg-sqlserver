@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: 'YourStr0ngPass!'
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'YourStr0ngPass!' -Q 'SELECT 1' -b -C"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            python3 curl zip unzip tar autoconf autoconf-archive
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            vcpkg_installed
+            vcpkg_cache
+          key: vcpkg-linux-x64-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-linux-x64-
+
+      - name: Setup vcpkg
+        run: |
+          if [ ! -d "vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git
+          fi
+          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Install FreeTDS
+        run: |
+          ./vcpkg/vcpkg install --triplet=x64-linux \
+            --x-manifest-root=. \
+            --x-install-root=./vcpkg_installed
+
+      - name: Build libs
+        run: |
+          cmake --preset ci-linux \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          cmake --build --preset ci-linux
+
+      - name: Setup Prerequisites
+        uses: SindarinSDK/sindarin-pipelines/.github/actions/setup-prereqs@main
+
+      - name: Install Sindarin
+        uses: SindarinSDK/sindarin-pipelines/.github/actions/install-sindarin@main
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Install dependencies
+        uses: SindarinSDK/sindarin-pipelines/.github/actions/install-deps@main
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Run tests
+        shell: bash
+        env:
+          MSSQL_HOST: localhost
+          MSSQL_PORT: '1433'
+          MSSQL_DATABASE: master
+          MSSQL_USER: SA
+          MSSQL_PASSWORD: 'YourStr0ngPass!'
+        run: make test
+
+      - name: Diagnose compile errors
+        if: failure()
+        uses: SindarinSDK/sindarin-pipelines/.github/actions/diagnose-pkg@main

@@ -1,0 +1,320 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build-linux:
+    name: Build Linux Libraries (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            triplet: x64-linux
+            preset: ci-linux
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            triplet: arm64-linux
+            preset: ci-linux-arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            python3 curl zip unzip tar autoconf autoconf-archive
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            vcpkg_installed
+            vcpkg_cache
+          key: vcpkg-linux-${{ matrix.arch }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-linux-${{ matrix.arch }}-
+
+      - name: Setup vcpkg
+        run: |
+          if [ ! -d "vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git
+          fi
+          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Install dependencies
+        run: |
+          ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} \
+            --x-manifest-root=. \
+            --x-install-root=./vcpkg_installed
+
+      - name: Build libraries
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          cmake --build --preset ${{ matrix.preset }}
+
+      - name: Verify output
+        run: |
+          echo "Checking libs/linux directory..."
+          ls -la libs/linux/
+          echo ""
+          echo "Libraries:"
+          ls -la libs/linux/lib/*.a | head -20
+          echo ""
+          echo "Total libraries: $(ls libs/linux/lib/*.a | wc -l)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libs-linux-${{ matrix.arch }}
+          path: libs/linux/
+          retention-days: 7
+
+  build-darwin:
+    name: Build Darwin Libraries (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15
+            triplet: x64-osx
+            preset: ci-darwin
+          - arch: arm64
+            runner: macos-latest
+            triplet: arm64-osx
+            preset: ci-darwin-arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          brew install cmake ninja pkg-config python3 autoconf autoconf-archive
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            vcpkg_installed
+            vcpkg_cache
+          key: vcpkg-darwin-${{ matrix.arch }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-darwin-${{ matrix.arch }}-
+
+      - name: Setup vcpkg
+        run: |
+          if [ ! -d "vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git
+          fi
+          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Install dependencies
+        run: |
+          ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} \
+            --x-manifest-root=. \
+            --x-install-root=./vcpkg_installed
+
+      - name: Build libraries
+        run: |
+          cmake --preset ${{ matrix.preset }} \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          cmake --build --preset ${{ matrix.preset }}
+
+      - name: Verify output
+        run: |
+          echo "Checking libs/darwin directory..."
+          ls -la libs/darwin/
+          echo ""
+          echo "Libraries:"
+          ls -la libs/darwin/lib/*.a | head -20
+          echo ""
+          echo "Total libraries: $(ls libs/darwin/lib/*.a | wc -l)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libs-darwin-${{ matrix.arch }}
+          path: libs/darwin/
+          retention-days: 7
+
+  build-windows:
+    name: Build Windows Libraries
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Remove system LLVM (conflicts with MinGW)
+        run: |
+          if (Test-Path "C:\Program Files\LLVM") {
+            Remove-Item -Recurse -Force "C:\Program Files\LLVM"
+          }
+        shell: pwsh
+
+      - name: Cache LLVM-MinGW
+        id: cache-llvm-mingw
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm-mingw
+          key: llvm-mingw-20241217
+
+      - name: Install LLVM-MinGW
+        if: steps.cache-llvm-mingw.outputs.cache-hit != 'true'
+        run: |
+          $url = "https://github.com/mstorsjo/llvm-mingw/releases/download/20241217/llvm-mingw-20241217-ucrt-x86_64.zip"
+          $output = "llvm-mingw.zip"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          Expand-Archive -Path $output -DestinationPath "C:\"
+          Rename-Item "C:\llvm-mingw-20241217-ucrt-x86_64" "C:\llvm-mingw"
+        shell: pwsh
+
+      - name: Add LLVM-MinGW to PATH
+        run: |
+          echo "C:\llvm-mingw\bin" >> $env:GITHUB_PATH
+        shell: pwsh
+
+      - name: Install build tools
+        run: |
+          choco install ninja -y
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            vcpkg_installed
+            vcpkg_cache
+          key: vcpkg-windows-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-windows-
+
+      - name: Setup vcpkg
+        run: |
+          if (!(Test-Path "vcpkg")) {
+            git clone https://github.com/microsoft/vcpkg.git
+          }
+          .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+        shell: pwsh
+
+      - name: Install dependencies
+        run: |
+          .\vcpkg\vcpkg.exe install --triplet=x64-mingw-static `
+            --x-manifest-root=. `
+            --x-install-root=.\vcpkg_installed
+        shell: pwsh
+
+      - name: Build libraries
+        run: |
+          cmake --preset ci-windows `
+            -DVCPKG_TARGET_TRIPLET=x64-mingw-static `
+            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}\vcpkg_installed
+          cmake --build --preset ci-windows
+        shell: pwsh
+
+      - name: Verify output
+        run: |
+          Write-Host "Checking libs/windows directory..."
+          Get-ChildItem libs/windows/
+          Write-Host ""
+          Write-Host "Libraries:"
+          Get-ChildItem libs/windows/lib/*.a | Select-Object -First 20
+          Write-Host ""
+          Write-Host "Total libraries: $((Get-ChildItem libs/windows/lib/*.a).Count)"
+        shell: pwsh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libs-windows
+          path: libs/windows/
+          retention-days: 7
+
+  create-release:
+    name: Create Release
+    needs: [build-linux, build-darwin, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libs-linux-x64
+          path: libs-linux-x64/
+
+      - name: Download Linux arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libs-linux-arm64
+          path: libs-linux-arm64/
+
+      - name: Download Darwin x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libs-darwin-x64
+          path: libs-darwin-x64/
+
+      - name: Download Darwin arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libs-darwin-arm64
+          path: libs-darwin-arm64/
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libs-windows
+          path: libs-windows/
+
+      - name: Display structure
+        run: |
+          for dir in libs-linux-x64 libs-linux-arm64 libs-darwin-x64 libs-darwin-arm64 libs-windows; do
+            echo "=== $dir ==="
+            find "$dir" -name "*.a" | wc -l
+            echo ""
+          done
+
+      - name: Create archives
+        run: |
+          tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-linux-x64.tar.gz" -C libs-linux-x64 .
+          tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-linux-arm64.tar.gz" -C libs-linux-arm64 .
+          tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-darwin-x64.tar.gz" -C libs-darwin-x64 .
+          tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-darwin-arm64.tar.gz" -C libs-darwin-arm64 .
+          cd libs-windows && zip -r "../sindarin-sqlserver-${{ env.VERSION }}-windows-x64.zip" . && cd ..
+
+          echo "Created archives:"
+          ls -la *.tar.gz *.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Sindarin SQL Server ${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}
+          draft: false
+          generate_release_notes: true
+          files: |
+            sindarin-sqlserver-*.tar.gz
+            sindarin-sqlserver-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
