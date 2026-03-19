@@ -65,6 +65,8 @@ jobs:
         run: |
           mkdir -p libs/linux/lib libs/linux/include
           find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
+          # FreeTDS names the DB-Lib static archive libdb-lib.a; create libsybdb.a alias
+          cp libs/linux/lib/libdb-lib.a libs/linux/lib/libsybdb.a
           cp -r freetds-install/include/* libs/linux/include/
           echo "${{ env.VERSION }}" > libs/linux/VERSION
           echo "linux" > libs/linux/PLATFORM
@@ -125,6 +127,8 @@ jobs:
         run: |
           mkdir -p libs/darwin/lib libs/darwin/include
           find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/darwin/lib/ \;
+          # FreeTDS names the DB-Lib static archive libdb-lib.a; create libsybdb.a alias
+          cp libs/darwin/lib/libdb-lib.a libs/darwin/lib/libsybdb.a
           cp -r freetds-install/include/* libs/darwin/include/
           echo "${{ env.VERSION }}" > libs/darwin/VERSION
           echo "darwin" > libs/darwin/PLATFORM
@@ -205,6 +209,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path libs/windows/lib, libs/windows/include | Out-Null
           Get-ChildItem freetds-install/lib -Filter "*.a" | Copy-Item -Destination libs/windows/lib
+          # FreeTDS names the DB-Lib static archive libdb-lib.a; create libsybdb.a alias
+          Copy-Item libs/windows/lib/libdb-lib.a libs/windows/lib/libsybdb.a
           Copy-Item -Recurse freetds-install/include/* -Destination libs/windows/include -Force
           "${{ env.VERSION }}" | Out-File libs/windows/VERSION -NoNewline
           "windows" | Out-File libs/windows/PLATFORM -NoNewline

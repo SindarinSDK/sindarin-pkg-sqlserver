@@ -64,10 +64,10 @@ jobs:
 
       - name: Package libs
         run: |
-          echo "=== freetds-install/lib contents ==="
-          ls -la freetds-install/lib/ || echo "(no lib dir)"
           mkdir -p libs/linux/lib libs/linux/include
           find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
+          # FreeTDS names the DB-Lib static archive libdb-lib.a; create libsybdb.a alias
+          cp libs/linux/lib/libdb-lib.a libs/linux/lib/libsybdb.a
           cp -r freetds-install/include/* libs/linux/include/
           echo "linux" > libs/linux/PLATFORM
           echo "Packaged libraries:"
@@ -77,6 +77,7 @@ jobs:
         run: |
           sudo cp -r freetds-install/include/* /usr/local/include/
           sudo find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} /usr/local/lib/ \;
+          sudo cp /usr/local/lib/libdb-lib.a /usr/local/lib/libsybdb.a
 
       - name: Setup Prerequisites
         uses: SindarinSDK/sindarin-pipelines/.github/actions/setup-prereqs@main
