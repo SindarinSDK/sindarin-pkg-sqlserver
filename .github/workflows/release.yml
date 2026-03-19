@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-${{ matrix.arch }}-v1
+          key: freetds-branch-1_4-linux-${{ matrix.arch }}-v2
 
       - name: Build FreeTDS
         run: |
@@ -55,7 +55,8 @@ jobs:
               -DBUILD_SHARED_LIBS=OFF \
               -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
-              -DENABLE_ODBC=OFF
+              -DENABLE_ODBC=OFF \
+              -DBUILD_TESTING=OFF
             cmake --build freetds/build -j$(nproc)
             cmake --install freetds/build
           fi
@@ -99,7 +100,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-v1
+          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-v2
 
       - name: Build FreeTDS
         run: |
@@ -114,7 +115,8 @@ jobs:
               -DBUILD_SHARED_LIBS=OFF \
               -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
-              -DENABLE_ODBC=OFF
+              -DENABLE_ODBC=OFF \
+              -DBUILD_TESTING=OFF
             cmake --build freetds/build -j$(sysctl -n hw.logicalcpu)
             cmake --install freetds/build
           fi
@@ -177,7 +179,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-windows-x64-v1
+          key: freetds-branch-1_4-windows-x64-v2
 
       - name: Build FreeTDS
         run: |
@@ -192,7 +194,8 @@ jobs:
               -DBUILD_SHARED_LIBS=OFF `
               -DCMAKE_POSITION_INDEPENDENT_CODE=ON `
               -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON `
-              -DENABLE_ODBC=OFF
+              -DENABLE_ODBC=OFF `
+              -DBUILD_TESTING=OFF
             cmake --build freetds/build -j
             cmake --install freetds/build
           }
