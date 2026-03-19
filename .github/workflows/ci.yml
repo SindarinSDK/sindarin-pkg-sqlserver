@@ -7,9 +7,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
-
 jobs:
   test:
     name: Test
@@ -38,39 +35,40 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            python3 curl zip unzip tar autoconf autoconf-archive
+          sudo apt-get install -y build-essential cmake ninja-build
 
-      - name: Cache vcpkg
+      - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
-          path: |
-            vcpkg
-            vcpkg_installed
-            vcpkg_cache
-          key: vcpkg-linux-x64-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-linux-x64-
+          path: freetds-install
+          key: freetds-branch-1.4-linux-x64-v1
 
-      - name: Setup vcpkg
+      - name: Build FreeTDS
         run: |
-          if [ ! -d "vcpkg" ]; then
-            git clone https://github.com/microsoft/vcpkg.git
+          if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
+            echo "Using cached FreeTDS build"
+          else
+            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            cmake -S freetds -B freetds/build \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=$(pwd)/freetds-install \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+              -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+              -DENABLE_ODBC=OFF
+            cmake --build freetds/build -j$(nproc)
+            cmake --install freetds/build
           fi
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Install FreeTDS
+      - name: Package libs
         run: |
-          ./vcpkg/vcpkg install --triplet=x64-linux \
-            --x-manifest-root=. \
-            --x-install-root=./vcpkg_installed
-
-      - name: Build libs
-        run: |
-          cmake --preset ci-linux \
-            -DVCPKG_TARGET_TRIPLET=x64-linux \
-            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
-          cmake --build --preset ci-linux
+          mkdir -p libs/linux/lib libs/linux/include
+          find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
+          cp -r freetds-install/include/* libs/linux/include/
+          echo "linux" > libs/linux/PLATFORM
+          echo "Packaged libraries:"
+          ls libs/linux/lib/
 
       - name: Setup Prerequisites
         uses: SindarinSDK/sindarin-pipelines/.github/actions/setup-prereqs@main

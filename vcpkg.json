@@ -3,12 +3,5 @@
   "name": "sindarin-sqlserver",
   "version": "1.0.0",
   "description": "FreeTDS static library for SQL Server connectivity",
-  "supports": "!uwp",
-  "dependencies": [
-    {
-      "name": "freetds",
-      "default-features": false,
-      "features": ["openssl"]
-    }
-  ]
+  "dependencies": []
 }

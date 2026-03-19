@@ -12,7 +12,6 @@ on:
         type: string
 
 env:
-  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
   VERSION: ${{ github.event.inputs.version || github.ref_name }}
 
 jobs:
@@ -24,12 +23,10 @@ jobs:
         include:
           - arch: x64
             runner: ubuntu-latest
-            triplet: x64-linux
-            preset: ci-linux
+            platform: linux
           - arch: arm64
             runner: ubuntu-24.04-arm
-            triplet: arm64-linux
-            preset: ci-linux-arm64
+            platform: linux
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,48 +34,40 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            python3 curl zip unzip tar autoconf autoconf-archive
+          sudo apt-get install -y build-essential cmake ninja-build
 
-      - name: Cache vcpkg
+      - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
-          path: |
-            vcpkg
-            vcpkg_installed
-            vcpkg_cache
-          key: vcpkg-linux-${{ matrix.arch }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-linux-${{ matrix.arch }}-
+          path: freetds-install
+          key: freetds-branch-1.4-linux-${{ matrix.arch }}-v1
 
-      - name: Setup vcpkg
+      - name: Build FreeTDS
         run: |
-          if [ ! -d "vcpkg" ]; then
-            git clone https://github.com/microsoft/vcpkg.git
+          if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
+            echo "Using cached FreeTDS build"
+          else
+            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            cmake -S freetds -B freetds/build \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=$(pwd)/freetds-install \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+              -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+              -DENABLE_ODBC=OFF
+            cmake --build freetds/build -j$(nproc)
+            cmake --install freetds/build
           fi
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Install dependencies
+      - name: Package libraries
         run: |
-          ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} \
-            --x-manifest-root=. \
-            --x-install-root=./vcpkg_installed
-
-      - name: Build libraries
-        run: |
-          cmake --preset ${{ matrix.preset }} \
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
-          cmake --build --preset ${{ matrix.preset }}
-
-      - name: Verify output
-        run: |
-          echo "Checking libs/linux directory..."
-          ls -la libs/linux/
-          echo ""
-          echo "Libraries:"
-          ls -la libs/linux/lib/*.a | head -20
-          echo ""
+          mkdir -p libs/linux/lib libs/linux/include
+          find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
+          cp -r freetds-install/include/* libs/linux/include/
+          echo "${{ env.VERSION }}" > libs/linux/VERSION
+          echo "linux" > libs/linux/PLATFORM
+          ls libs/linux/lib/*.a
           echo "Total libraries: $(ls libs/linux/lib/*.a | wc -l)"
 
       - name: Upload artifacts
@@ -96,59 +85,48 @@ jobs:
         include:
           - arch: x64
             runner: macos-15
-            triplet: x64-osx
-            preset: ci-darwin
           - arch: arm64
             runner: macos-latest
-            triplet: arm64-osx
-            preset: ci-darwin-arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          brew install cmake ninja pkg-config python3 autoconf autoconf-archive
+          brew install cmake ninja
 
-      - name: Cache vcpkg
+      - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
-          path: |
-            vcpkg
-            vcpkg_installed
-            vcpkg_cache
-          key: vcpkg-darwin-${{ matrix.arch }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-darwin-${{ matrix.arch }}-
+          path: freetds-install
+          key: freetds-branch-1.4-darwin-${{ matrix.arch }}-v1
 
-      - name: Setup vcpkg
+      - name: Build FreeTDS
         run: |
-          if [ ! -d "vcpkg" ]; then
-            git clone https://github.com/microsoft/vcpkg.git
+          if [ -d "freetds-install/lib" ] && [ -f "freetds-install/include/sybdb.h" ]; then
+            echo "Using cached FreeTDS build"
+          else
+            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            cmake -S freetds -B freetds/build \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=$(pwd)/freetds-install \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+              -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+              -DENABLE_ODBC=OFF
+            cmake --build freetds/build -j$(sysctl -n hw.logicalcpu)
+            cmake --install freetds/build
           fi
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-      - name: Install dependencies
+      - name: Package libraries
         run: |
-          ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} \
-            --x-manifest-root=. \
-            --x-install-root=./vcpkg_installed
-
-      - name: Build libraries
-        run: |
-          cmake --preset ${{ matrix.preset }} \
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
-          cmake --build --preset ${{ matrix.preset }}
-
-      - name: Verify output
-        run: |
-          echo "Checking libs/darwin directory..."
-          ls -la libs/darwin/
-          echo ""
-          echo "Libraries:"
-          ls -la libs/darwin/lib/*.a | head -20
-          echo ""
+          mkdir -p libs/darwin/lib libs/darwin/include
+          find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/darwin/lib/ \;
+          cp -r freetds-install/include/* libs/darwin/include/
+          echo "${{ env.VERSION }}" > libs/darwin/VERSION
+          echo "darwin" > libs/darwin/PLATFORM
+          ls libs/darwin/lib/*.a
           echo "Total libraries: $(ls libs/darwin/lib/*.a | wc -l)"
 
       - name: Upload artifacts
@@ -183,63 +161,51 @@ jobs:
         if: steps.cache-llvm-mingw.outputs.cache-hit != 'true'
         run: |
           $url = "https://github.com/mstorsjo/llvm-mingw/releases/download/20241217/llvm-mingw-20241217-ucrt-x86_64.zip"
-          $output = "llvm-mingw.zip"
-          Invoke-WebRequest -Uri $url -OutFile $output
-          Expand-Archive -Path $output -DestinationPath "C:\"
+          Invoke-WebRequest -Uri $url -OutFile "llvm-mingw.zip"
+          Expand-Archive -Path "llvm-mingw.zip" -DestinationPath "C:\"
           Rename-Item "C:\llvm-mingw-20241217-ucrt-x86_64" "C:\llvm-mingw"
         shell: pwsh
 
       - name: Add LLVM-MinGW to PATH
-        run: |
-          echo "C:\llvm-mingw\bin" >> $env:GITHUB_PATH
+        run: echo "C:\llvm-mingw\bin" >> $env:GITHUB_PATH
         shell: pwsh
 
       - name: Install build tools
-        run: |
-          choco install ninja -y
+        run: choco install ninja -y
 
-      - name: Cache vcpkg
+      - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
-          path: |
-            vcpkg
-            vcpkg_installed
-            vcpkg_cache
-          key: vcpkg-windows-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-windows-
+          path: freetds-install
+          key: freetds-branch-1.4-windows-x64-v1
 
-      - name: Setup vcpkg
+      - name: Build FreeTDS
         run: |
-          if (!(Test-Path "vcpkg")) {
-            git clone https://github.com/microsoft/vcpkg.git
+          if ((Test-Path "freetds-install/lib") -and (Test-Path "freetds-install/include/sybdb.h")) {
+            Write-Host "Using cached FreeTDS build"
+          } else {
+            git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git
+            cmake -S freetds -B freetds/build `
+              -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_INSTALL_PREFIX="$(Get-Location)/freetds-install" `
+              -DBUILD_SHARED_LIBS=OFF `
+              -DCMAKE_POSITION_INDEPENDENT_CODE=ON `
+              -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON `
+              -DENABLE_ODBC=OFF
+            cmake --build freetds/build -j
+            cmake --install freetds/build
           }
-          .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
         shell: pwsh
 
-      - name: Install dependencies
+      - name: Package libraries
         run: |
-          .\vcpkg\vcpkg.exe install --triplet=x64-mingw-static `
-            --x-manifest-root=. `
-            --x-install-root=.\vcpkg_installed
-        shell: pwsh
-
-      - name: Build libraries
-        run: |
-          cmake --preset ci-windows `
-            -DVCPKG_TARGET_TRIPLET=x64-mingw-static `
-            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}\vcpkg_installed
-          cmake --build --preset ci-windows
-        shell: pwsh
-
-      - name: Verify output
-        run: |
-          Write-Host "Checking libs/windows directory..."
-          Get-ChildItem libs/windows/
-          Write-Host ""
-          Write-Host "Libraries:"
-          Get-ChildItem libs/windows/lib/*.a | Select-Object -First 20
-          Write-Host ""
+          New-Item -ItemType Directory -Force -Path libs/windows/lib, libs/windows/include | Out-Null
+          Get-ChildItem freetds-install/lib -Filter "*.a" | Copy-Item -Destination libs/windows/lib
+          Copy-Item -Recurse freetds-install/include/* -Destination libs/windows/include -Force
+          "${{ env.VERSION }}" | Out-File libs/windows/VERSION -NoNewline
+          "windows" | Out-File libs/windows/PLATFORM -NoNewline
+          Get-ChildItem libs/windows/lib/*.a
           Write-Host "Total libraries: $((Get-ChildItem libs/windows/lib/*.a).Count)"
         shell: pwsh
 
@@ -287,14 +253,6 @@ jobs:
           name: libs-windows
           path: libs-windows/
 
-      - name: Display structure
-        run: |
-          for dir in libs-linux-x64 libs-linux-arm64 libs-darwin-x64 libs-darwin-arm64 libs-windows; do
-            echo "=== $dir ==="
-            find "$dir" -name "*.a" | wc -l
-            echo ""
-          done
-
       - name: Create archives
         run: |
           tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-linux-x64.tar.gz" -C libs-linux-x64 .
@@ -302,7 +260,6 @@ jobs:
           tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-darwin-x64.tar.gz" -C libs-darwin-x64 .
           tar -czvf "sindarin-sqlserver-${{ env.VERSION }}-darwin-arm64.tar.gz" -C libs-darwin-arm64 .
           cd libs-windows && zip -r "../sindarin-sqlserver-${{ env.VERSION }}-windows-x64.zip" . && cd ..
-
           echo "Created archives:"
           ls -la *.tar.gz *.zip
 

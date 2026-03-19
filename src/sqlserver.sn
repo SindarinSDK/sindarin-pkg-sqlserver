@@ -53,8 +53,6 @@
 
 @include <sybdb.h>
 @link sybdb
-@link ssl
-@link crypto
 @source "sqlserver.sn.c"
 
 # ==============================================================================

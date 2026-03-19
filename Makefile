@@ -25,30 +25,6 @@ else
 endif
 
 #------------------------------------------------------------------------------
-# vcpkg triplet / CMake preset (for build-libs)
-#------------------------------------------------------------------------------
-ifeq ($(OS),Windows_NT)
-    VCPKG_TRIPLET := x64-mingw-static
-    CMAKE_PRESET  := ci-windows
-else ifeq ($(PLATFORM),darwin)
-    ifeq ($(shell uname -m),arm64)
-        VCPKG_TRIPLET := arm64-osx
-        CMAKE_PRESET  := ci-darwin-arm64
-    else
-        VCPKG_TRIPLET := x64-osx
-        CMAKE_PRESET  := ci-darwin
-    endif
-else
-    ifeq ($(shell uname -m),aarch64)
-        VCPKG_TRIPLET := arm64-linux
-        CMAKE_PRESET  := ci-linux-arm64
-    else
-        VCPKG_TRIPLET := x64-linux
-        CMAKE_PRESET  := ci-linux
-    endif
-endif
-
-#------------------------------------------------------------------------------
 # Configuration
 #------------------------------------------------------------------------------
 BIN_DIR := bin
@@ -89,17 +65,28 @@ $(BIN_DIR):
 $(BIN_DIR)/%$(EXE_EXT): tests/%.sn $(SRC_SOURCES) | $(BIN_DIR)
 	@$(SN) $< -o $@ -l 1
 
+FREETDS_SRC   := /tmp/freetds-src
+FREETDS_BUILD := /tmp/freetds-build
+FREETDS_INST  := /tmp/freetds-install
+
 build-libs:
-	@echo "Building FreeTDS libraries for $(PLATFORM) ($(VCPKG_TRIPLET))..."
-	@if [ ! -d "vcpkg" ]; then git clone https://github.com/microsoft/vcpkg.git; fi
-	@./vcpkg/bootstrap-vcpkg.sh -disableMetrics
-	@./vcpkg/vcpkg install --triplet=$(VCPKG_TRIPLET) \
-	    --x-manifest-root=. \
-	    --x-install-root=./vcpkg_installed
-	@cmake --preset $(CMAKE_PRESET) \
-	    -DVCPKG_TARGET_TRIPLET=$(VCPKG_TRIPLET) \
-	    -DVCPKG_INSTALLED_DIR=$(shell pwd)/vcpkg_installed
-	@cmake --build --preset $(CMAKE_PRESET)
+	@echo "Building FreeTDS from source for $(PLATFORM)..."
+	@if [ ! -d "$(FREETDS_SRC)" ]; then \
+	    git clone --depth=1 --branch Branch-1.4 https://github.com/FreeTDS/freetds.git $(FREETDS_SRC); \
+	fi
+	@cmake -S $(FREETDS_SRC) -B $(FREETDS_BUILD) \
+	    -G Ninja \
+	    -DCMAKE_BUILD_TYPE=Release \
+	    -DCMAKE_INSTALL_PREFIX=$(FREETDS_INST) \
+	    -DBUILD_SHARED_LIBS=OFF \
+	    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+	    -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+	    -DENABLE_ODBC=OFF
+	@cmake --build $(FREETDS_BUILD) -j
+	@cmake --install $(FREETDS_BUILD)
+	@cmake -S . -B build/package \
+	    -DFREETDS_INSTALL_PREFIX=$(FREETDS_INST)
+	@cmake --build build/package
 	@echo "Libraries built in libs/$(PLATFORM)/"
 
 install-libs:
