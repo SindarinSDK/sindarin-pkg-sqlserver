@@ -35,7 +35,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential autoconf automake libtool gettext
+          sudo apt-get install -y build-essential autoconf automake libtool gettext gperf
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
