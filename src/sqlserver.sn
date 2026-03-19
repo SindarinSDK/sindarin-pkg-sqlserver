@@ -53,8 +53,6 @@
 
 @include <sybdb.h>
 @link sybdb
-@link tdssrv
-@link replacements
 @source "sqlserver.sn.c"
 
 # ==============================================================================
