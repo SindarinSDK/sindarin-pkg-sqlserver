@@ -112,7 +112,7 @@ jobs:
           else
             git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cd freetds
-            [ -f configure ] || autoreconf -i
+            [ -f configure ] || ACLOCAL_PATH="$(brew --prefix gettext)/share/aclocal" autoreconf -i
             ./configure \
               --prefix=$(pwd)/../freetds-install \
               --disable-shared \
