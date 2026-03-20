@@ -34,13 +34,13 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential autoconf automake libtool gettext gperf
+          sudo apt-get install -y build-essential autoconf automake libtool gettext gperf libssl-dev
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-${{ matrix.arch }}-autoconf-tds74-v1
+          key: freetds-branch-1_4-linux-${{ matrix.arch }}-autoconf-tds74-ssl-v1
 
       - name: Build FreeTDS
         run: |
@@ -54,7 +54,7 @@ jobs:
               --prefix=$(pwd)/../freetds-install \
               --disable-shared \
               --enable-static \
-              --without-openssl \
+              --with-openssl \
               --without-kerberos \
               --disable-odbc \
               --with-tdsver=7.4 \
@@ -66,8 +66,13 @@ jobs:
 
       - name: Package libraries
         run: |
-          mkdir -p libs/linux/lib libs/linux/include
-          find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/linux/lib/ \;
+          mkdir -p libs/linux/lib libs/linux/include ar_merge/freetds ar_merge/ssl ar_merge/crypto
+          OPENSSL_LIB=$(pkg-config --variable=libdir openssl 2>/dev/null || find /usr/lib -name "libssl.a" -exec dirname {} \; | head -1)
+          cd ar_merge/freetds && ar x ../../freetds-install/lib/libsybdb.a && cd ../..
+          cd ar_merge/ssl     && ar x "$OPENSSL_LIB/libssl.a"             && cd ../..
+          cd ar_merge/crypto  && ar x "$OPENSSL_LIB/libcrypto.a"          && cd ../..
+          ar rcs libs/linux/lib/libsybdb.a ar_merge/freetds/*.o ar_merge/ssl/*.o ar_merge/crypto/*.o
+          rm -rf ar_merge
           cp -r freetds-install/include/* libs/linux/include/
           echo "${{ env.VERSION }}" > libs/linux/VERSION
           echo "linux" > libs/linux/PLATFORM
@@ -97,13 +102,13 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          brew install autoconf automake libtool gettext gperf
+          brew install autoconf automake libtool gettext gperf openssl
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-autoconf-tds74-v1
+          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-autoconf-tds74-ssl-v1
 
       - name: Build FreeTDS
         run: |
@@ -124,7 +129,7 @@ jobs:
               --prefix=$(pwd)/../freetds-install \
               --disable-shared \
               --enable-static \
-              --without-openssl \
+              --with-openssl=$(brew --prefix openssl) \
               --without-kerberos \
               --disable-odbc \
               --with-tdsver=7.4 \
@@ -136,8 +141,12 @@ jobs:
 
       - name: Package libraries
         run: |
+          OPENSSL_DIR=$(brew --prefix openssl)
           mkdir -p libs/darwin/lib libs/darwin/include
-          find freetds-install/lib -maxdepth 1 -name "*.a" -exec cp {} libs/darwin/lib/ \;
+          libtool -static -o libs/darwin/lib/libsybdb.a \
+            freetds-install/lib/libsybdb.a \
+            $OPENSSL_DIR/lib/libssl.a \
+            $OPENSSL_DIR/lib/libcrypto.a
           cp -r freetds-install/include/* libs/darwin/include/
           echo "${{ env.VERSION }}" > libs/darwin/VERSION
           echo "darwin" > libs/darwin/PLATFORM
@@ -188,11 +197,15 @@ jobs:
       - name: Install build tools
         run: choco install ninja gperf -y
 
+      - name: Install MSYS2 OpenSSL (mingw64 static)
+        run: C:\msys64\usr\bin\pacman.exe -S --noconfirm mingw-w64-x86_64-openssl
+        shell: cmd
+
       - name: Cache FreeTDS build
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-windows-x64-v4
+          key: freetds-branch-1_4-windows-x64-ssl-v1
 
       - name: Build FreeTDS
         run: |
@@ -206,7 +219,8 @@ jobs:
               -DCMAKE_INSTALL_PREFIX="$(Get-Location)/freetds-install" `
               -DBUILD_SHARED_LIBS=OFF `
               -DCMAKE_POSITION_INDEPENDENT_CODE=ON `
-              -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON `
+              -DOPENSSL_ROOT_DIR=C:/msys64/mingw64 `
+              -DOPENSSL_USE_STATIC_LIBS=ON `
               -DENABLE_ODBC=OFF `
               -DBUILD_TESTING=OFF
             cmake --build freetds/build -j
@@ -217,9 +231,17 @@ jobs:
       - name: Package libraries
         run: |
           New-Item -ItemType Directory -Force -Path libs/windows/lib, libs/windows/include | Out-Null
-          Get-ChildItem freetds-install/lib -Filter "*.a" | Copy-Item -Destination libs/windows/lib
-          # FreeTDS names the DB-Lib static archive libdb-lib.a; create libsybdb.a alias
-          Copy-Item libs/windows/lib/libdb-lib.a libs/windows/lib/libsybdb.a
+          # Merge FreeTDS + OpenSSL into a single self-contained libsybdb.a
+          $llvmar = "C:\llvm-mingw\bin\llvm-ar.exe"
+          $mriScript = @"
+CREATE libs/windows/lib/libsybdb.a
+ADDLIB freetds-install/lib/libdb-lib.a
+ADDLIB C:/msys64/mingw64/lib/libssl.a
+ADDLIB C:/msys64/mingw64/lib/libcrypto.a
+SAVE
+END
+"@
+          $mriScript | & $llvmar -M
           Copy-Item -Recurse freetds-install/include/* -Destination libs/windows/include -Force
           "${{ env.VERSION }}" | Out-File libs/windows/VERSION -NoNewline
           "windows" | Out-File libs/windows/PLATFORM -NoNewline
