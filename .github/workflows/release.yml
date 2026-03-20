@@ -98,8 +98,9 @@ jobs:
       - name: Install system dependencies
         run: |
           brew install autoconf automake libtool gettext gperf
-          # gettext is keg-only; export its m4 macros for autoreconf
-          echo "ACLOCAL_PATH=$(brew --prefix gettext)/share/aclocal" >> $GITHUB_ENV
+          # gettext is keg-only; force-link so its m4 macros land in the
+          # default aclocal search path (/opt/homebrew/share/aclocal)
+          brew link --force --overwrite gettext
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
