@@ -98,9 +98,6 @@ jobs:
       - name: Install system dependencies
         run: |
           brew install autoconf automake libtool gettext gperf
-          # gettext is keg-only; force-link so its m4 macros land in the
-          # default aclocal search path (/opt/homebrew/share/aclocal)
-          brew link --force --overwrite gettext
 
       - name: Cache FreeTDS build
         uses: actions/cache@v4
@@ -115,7 +112,16 @@ jobs:
           else
             git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git
             cd freetds
-            [ -f configure ] || autoreconf -i
+            if [ ! -f configure ]; then
+              # gettext 1.0 removed iconv.m4; macOS always has iconv in libc
+              # so provide a minimal stub to satisfy AM_ICONV in configure.ac
+              mkdir -p m4
+              cat > m4/iconv.m4 << 'ICONV_M4'
+AC_DEFUN([AM_ICONV_LINK], [LIBICONV= ; LTLIBICONV= ; AC_SUBST([LIBICONV]) ; AC_SUBST([LTLIBICONV])])
+AC_DEFUN([AM_ICONV], [AM_ICONV_LINK])
+ICONV_M4
+              autoreconf -i
+            fi
             ./configure \
               --prefix=$(pwd)/../freetds-install \
               --disable-shared \
