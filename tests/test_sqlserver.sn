@@ -14,7 +14,7 @@ fn main(): void =>
 
     # Test 1: CREATE TABLE
     conn.exec("IF OBJECT_ID('sn_sql_test', 'U') IS NOT NULL DROP TABLE sn_sql_test")
-    conn.exec("CREATE TABLE sn_sql_test (id INT IDENTITY(1,1) PRIMARY KEY, name NVARCHAR(100), age INT, score FLOAT, notes NVARCHAR(200))")
+    conn.exec("CREATE TABLE sn_sql_test (id INT IDENTITY(1,1) PRIMARY KEY, name NVARCHAR(100) NULL, age INT NULL, score FLOAT NULL, notes NVARCHAR(200) NULL)")
     print("PASS: CREATE TABLE\n")
 
     # Test 2: INSERT rows
