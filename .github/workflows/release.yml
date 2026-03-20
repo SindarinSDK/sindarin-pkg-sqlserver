@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-${{ matrix.arch }}-autoconf-v1
+          key: freetds-branch-1_4-linux-${{ matrix.arch }}-autoconf-tds74-v1
 
       - name: Build FreeTDS
         run: |
@@ -57,6 +57,7 @@ jobs:
               --without-openssl \
               --without-kerberos \
               --disable-odbc \
+              --with-tdsver=7.4 \
               CFLAGS="-fPIC"
             make -j$(nproc)
             make install
@@ -102,7 +103,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-autoconf-v1
+          key: freetds-branch-1_4-darwin-${{ matrix.arch }}-autoconf-tds74-v1
 
       - name: Build FreeTDS
         run: |
@@ -119,6 +120,7 @@ jobs:
               --without-openssl \
               --without-kerberos \
               --disable-odbc \
+              --with-tdsver=7.4 \
               CFLAGS="-fPIC"
             make -j$(sysctl -n hw.logicalcpu)
             make install

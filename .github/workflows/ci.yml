@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: freetds-install
-          key: freetds-branch-1_4-linux-x64-autoconf-v1
+          key: freetds-branch-1_4-linux-x64-autoconf-tds74-v1
 
       - name: Build FreeTDS
         run: |
@@ -58,6 +58,7 @@ jobs:
               --without-openssl \
               --without-kerberos \
               --disable-odbc \
+              --with-tdsver=7.4 \
               CFLAGS="-fPIC"
             make -j$(nproc)
             make install
