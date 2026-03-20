@@ -116,7 +116,7 @@ jobs:
               # gettext 1.0 removed iconv.m4; macOS always has iconv in libc
               # so provide a minimal stub to satisfy AM_ICONV in configure.ac
               mkdir -p m4
-              printf 'AC_DEFUN([AM_ICONV_LINK],[LIBICONV= ;LTLIBICONV= ;AC_SUBST([LIBICONV]);AC_SUBST([LTLIBICONV])])\n' > m4/iconv.m4
+              printf 'AC_DEFUN([AM_ICONV_LINK],[\n  LIBICONV=\n  LTLIBICONV=\n  AC_SUBST([LIBICONV])\n  AC_SUBST([LTLIBICONV])\n])\n' > m4/iconv.m4
               printf 'AC_DEFUN([AM_ICONV],[AM_ICONV_LINK])\n' >> m4/iconv.m4
               autoreconf -i
             fi
