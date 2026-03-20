@@ -233,14 +233,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path libs/windows/lib, libs/windows/include | Out-Null
           # Merge FreeTDS + OpenSSL into a single self-contained libsybdb.a
           $llvmar = "C:\llvm-mingw\bin\llvm-ar.exe"
-          $mriScript = @"
-CREATE libs/windows/lib/libsybdb.a
-ADDLIB freetds-install/lib/libdb-lib.a
-ADDLIB C:/msys64/mingw64/lib/libssl.a
-ADDLIB C:/msys64/mingw64/lib/libcrypto.a
-SAVE
-END
-"@
+          $mriScript = "CREATE libs/windows/lib/libsybdb.a`nADDLIB freetds-install/lib/libdb-lib.a`nADDLIB C:/msys64/mingw64/lib/libssl.a`nADDLIB C:/msys64/mingw64/lib/libcrypto.a`nSAVE`nEND`n"
           $mriScript | & $llvmar -M
           Copy-Item -Recurse freetds-install/include/* -Destination libs/windows/include -Force
           "${{ env.VERSION }}" | Out-File libs/windows/VERSION -NoNewline
