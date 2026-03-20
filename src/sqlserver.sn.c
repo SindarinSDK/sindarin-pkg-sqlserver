@@ -41,8 +41,13 @@ static char g_last_error[4096] = "";
 static int sql_err_handler(DBPROCESS *dbproc, int severity, int dberr,
                             int oserr, char *dberrstr, char *oserrstr)
 {
-    (void)dbproc; (void)severity; (void)dberr; (void)oserr; (void)oserrstr;
-    if (dberrstr && *dberrstr)
+    (void)dbproc; (void)severity; (void)oserr; (void)oserrstr;
+    /* SYBESMSG (20018) fires after the msg handler and carries only a generic
+     * "General SQL Server error: Check messages from the SQL Server" string.
+     * Only update g_last_error from the err handler when the msg handler has
+     * not already captured a more specific message. */
+    if (dberr == SYBESMSG) return INT_CANCEL;
+    if (dberrstr && *dberrstr && g_last_error[0] == '\0')
         snprintf(g_last_error, sizeof(g_last_error), "%s", dberrstr);
     return INT_CANCEL;
 }
@@ -51,11 +56,14 @@ static int sql_msg_handler(DBPROCESS *dbproc, DBINT msgno, int msgstate,
                             int severity, char *msgtext, char *srvname,
                             char *procname, int line)
 {
-    (void)dbproc; (void)msgno; (void)msgstate; (void)srvname;
-    (void)procname; (void)line;
-    /* Capture non-informational messages (severity > 0) as last error */
-    if (severity > 0 && msgtext && *msgtext)
+    (void)dbproc; (void)msgstate; (void)srvname; (void)procname; (void)line;
+    /* Capture non-informational messages (severity > 0) as last error and
+     * always print them to stderr so CI logs show the actual SQL Server text. */
+    if (severity > 0 && msgtext && *msgtext) {
+        fprintf(stderr, "sqlserver: msg (no=%d sev=%d): %s\n",
+                (int)msgno, severity, msgtext);
         snprintf(g_last_error, sizeof(g_last_error), "%s", msgtext);
+    }
     return 0;
 }
 
@@ -327,6 +335,7 @@ void sn_sql_conn_exec(RtSqlServerConn *c, char *sql)
 {
     if (!c || !sql) return;
     DBPROCESS *dbproc = DBPROC(c);
+    g_last_error[0] = '\0';
 
     if (dbcmd(dbproc, sql) == FAIL) {
         fprintf(stderr, "sqlserver: exec: dbcmd failed\n");
@@ -349,6 +358,7 @@ SnArray *sn_sql_conn_query(RtSqlServerConn *c, char *sql)
 {
     if (!c || !sql) return sn_array_new(sizeof(RtSqlServerRow), 0);
     DBPROCESS *dbproc = DBPROC(c);
+    g_last_error[0] = '\0';
 
     if (dbcmd(dbproc, sql) == FAIL) {
         fprintf(stderr, "sqlserver: query: dbcmd failed\n");
@@ -551,6 +561,7 @@ static void stmt_exec_internal(RtSqlServerStmt *s)
 {
     char *sql = build_sql(s);
     DBPROCESS *dbproc = STMT_DBPROC(s);
+    g_last_error[0] = '\0';
 
     if (dbcmd(dbproc, sql) == FAIL) {
         free(sql);
