@@ -321,12 +321,7 @@ RtSqlServerConn *sn_sql_conn_connect(char *conn_str)
         exit(1);
     }
 
-    RtSqlServerConn *c = (RtSqlServerConn *)calloc(1, sizeof(RtSqlServerConn));
-    if (!c) {
-        fprintf(stderr, "SqlServerConn.connect: allocation failed\n");
-        dbclose(dbproc);
-        exit(1);
-    }
+    RtSqlServerConn *c = __sn__SqlServerConn__new();
     c->db_ptr = (long long)(uintptr_t)dbproc;
     return c;
 }
@@ -386,11 +381,7 @@ RtSqlServerStmt *sn_sql_conn_prepare(RtSqlServerConn *c, char *name, char *sql)
         if (*p == '?') param_count++;
     }
 
-    RtSqlServerStmt *s = (RtSqlServerStmt *)calloc(1, sizeof(RtSqlServerStmt));
-    if (!s) {
-        fprintf(stderr, "SqlServerConn.prepare: allocation failed\n");
-        exit(1);
-    }
+    RtSqlServerStmt *s = __sn__SqlServerStmt__new();
     s->db_ptr       = c->db_ptr;
     s->sql_template = (uint8_t *)strdup(sql);
     s->param_count  = (long long)param_count;
