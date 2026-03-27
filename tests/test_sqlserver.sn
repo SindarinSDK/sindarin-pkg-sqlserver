@@ -2,136 +2,136 @@ import "../src/sqlserver"
 import "../.sn/sindarin-pkg-sdk/src/os/env"
 
 fn connStr(): str =>
-    var host: str = Environment.getOr("MSSQL_HOST", "localhost")
-    var port: str = Environment.getOr("MSSQL_PORT", "1433")
-    var db: str   = Environment.getOr("MSSQL_DATABASE", "master")
-    var user: str = Environment.getOr("MSSQL_USER", "SA")
-    var pass: str = Environment.getOr("MSSQL_PASSWORD", "")
-    return $"server={host}:{port};database={db};user={user};password={pass}"
+  var host: str = Environment.getOr("MSSQL_HOST", "localhost")
+  var port: str = Environment.getOr("MSSQL_PORT", "1433")
+  var db: str = Environment.getOr("MSSQL_DATABASE", "master")
+  var user: str = Environment.getOr("MSSQL_USER", "SA")
+  var pass: str = Environment.getOr("MSSQL_PASSWORD", "")
+  return $"server={host}:{port};database={db};user={user};password={pass}"
 
 fn main(): void =>
-    var conn: SqlServerConn = SqlServerConn.connect(connStr())
+  var conn: SqlServerConn = SqlServerConn.connect(connStr())
 
-    # Test 1: CREATE TABLE
-    conn.exec("IF OBJECT_ID('sn_sql_test', 'U') IS NOT NULL DROP TABLE sn_sql_test")
-    conn.exec("CREATE TABLE sn_sql_test (id INT IDENTITY(1,1) PRIMARY KEY, name NVARCHAR(100) NULL, age INT NULL, score FLOAT NULL, notes NVARCHAR(200) NULL)")
-    print("PASS: CREATE TABLE\n")
+  # Test 1: CREATE TABLE
+  conn.exec("IF OBJECT_ID('sn_sql_test', 'U') IS NOT NULL DROP TABLE sn_sql_test")
+  conn.exec("CREATE TABLE sn_sql_test (id INT IDENTITY(1,1) PRIMARY KEY, name NVARCHAR(100) NULL, age INT NULL, score FLOAT NULL, notes NVARCHAR(200) NULL)")
+  print("PASS: CREATE TABLE\n")
 
-    # Test 2: INSERT rows
-    conn.exec("INSERT INTO sn_sql_test (name, age, score, notes) VALUES (N'Alice', 30, 9.5, N'first')")
-    conn.exec("INSERT INTO sn_sql_test (name, age, score, notes) VALUES (N'Bob', 25, 7.2, NULL)")
-    print("PASS: INSERT\n")
+  # Test 2: INSERT rows
+  conn.exec("INSERT INTO sn_sql_test (name, age, score, notes) VALUES (N'Alice', 30, 9.5, N'first')")
+  conn.exec("INSERT INTO sn_sql_test (name, age, score, notes) VALUES (N'Bob', 25, 7.2, NULL)")
+  print("PASS: INSERT\n")
 
-    # Test 3: query returns correct row count
-    var rows: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test ORDER BY id")
-    if rows.length != 2 =>
-        print($"FAIL: expected 2 rows, got {rows.length}\n")
-        exit(1)
-    print("PASS: query row count\n")
+  # Test 3: query returns correct row count
+  var rows: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test ORDER BY id")
+  if rows.length != 2 =>
+    print($"FAIL: expected 2 rows, got {rows.length}\n")
+    exit(1)
+  print("PASS: query row count\n")
 
-    # Test 4: getString
-    if rows[0].getString("name") != "Alice" =>
-        print($"FAIL: expected 'Alice', got '{rows[0].getString(\"name\")}'\n")
-        exit(1)
-    if rows[1].getString("name") != "Bob" =>
-        print($"FAIL: expected 'Bob', got '{rows[1].getString(\"name\")}'\n")
-        exit(1)
-    print("PASS: getString\n")
+  # Test 4: getString
+  if rows[0].getString("name") != "Alice" =>
+    print($"FAIL: expected 'Alice', got '{rows[0].getString(\"name\")}'\n")
+    exit(1)
+  if rows[1].getString("name") != "Bob" =>
+    print($"FAIL: expected 'Bob', got '{rows[1].getString(\"name\")}'\n")
+    exit(1)
+  print("PASS: getString\n")
 
-    # Test 5: getInt
-    if rows[0].getInt("age") != 30 =>
-        print($"FAIL: expected age 30, got {rows[0].getInt(\"age\")}\n")
-        exit(1)
-    print("PASS: getInt\n")
+  # Test 5: getInt
+  if rows[0].getInt("age") != 30 =>
+    print($"FAIL: expected age 30, got {rows[0].getInt(\"age\")}\n")
+    exit(1)
+  print("PASS: getInt\n")
 
-    # Test 6: getFloat
-    if rows[0].getFloat("score") != 9.5 =>
-        print($"FAIL: expected score 9.5, got {rows[0].getFloat(\"score\")}\n")
-        exit(1)
-    print("PASS: getFloat\n")
+  # Test 6: getFloat
+  if rows[0].getFloat("score") != 9.5 =>
+    print($"FAIL: expected score 9.5, got {rows[0].getFloat(\"score\")}\n")
+    exit(1)
+  print("PASS: getFloat\n")
 
-    # Test 7: NULL detection
-    if rows[0].isNull("notes") =>
-        print("FAIL: Alice.notes should not be NULL\n")
-        exit(1)
-    if !rows[1].isNull("notes") =>
-        print("FAIL: Bob.notes should be NULL\n")
-        exit(1)
-    print("PASS: isNull\n")
+  # Test 7: NULL detection
+  if rows[0].isNull("notes") =>
+    print("FAIL: Alice.notes should not be NULL\n")
+    exit(1)
+  if !rows[1].isNull("notes") =>
+    print("FAIL: Bob.notes should be NULL\n")
+    exit(1)
+  print("PASS: isNull\n")
 
-    # Test 8: columnCount and columnName
-    if rows[0].columnCount() != 5 =>
-        print($"FAIL: expected 5 columns, got {rows[0].columnCount()}\n")
-        exit(1)
-    if rows[0].columnName(0) != "id" =>
-        print($"FAIL: expected column 0 'id', got '{rows[0].columnName(0)}'\n")
-        exit(1)
-    print("PASS: columnCount / columnName\n")
+  # Test 8: columnCount and columnName
+  if rows[0].columnCount() != 5 =>
+    print($"FAIL: expected 5 columns, got {rows[0].columnCount()}\n")
+    exit(1)
+  if rows[0].columnName(0) != "id" =>
+    print($"FAIL: expected column 0 'id', got '{rows[0].columnName(0)}'\n")
+    exit(1)
+  print("PASS: columnCount / columnName\n")
 
-    # Test 9: prepared statement with string, int, and float binding
-    var stmt: SqlServerStmt = conn.prepare("insert_user", "INSERT INTO sn_sql_test (name, age, score) VALUES (?, ?, ?)")
-    stmt.bindString(1, "Carol").bindInt(2, 35).bindFloat(3, 8.1).exec()
-    stmt.dispose()
+  # Test 9: prepared statement with string, int, and float binding
+  var stmt: SqlServerStmt = conn.prepare("insert_user", "INSERT INTO sn_sql_test (name, age, score) VALUES (?, ?, ?)")
+  stmt.bindString(1, "Carol").bindInt(2, 35).bindFloat(3, 8.1).exec()
+  stmt.dispose()
 
-    var rows2: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test WHERE name = N'Carol'")
-    if rows2.length != 1 =>
-        print($"FAIL: expected 1 Carol row, got {rows2.length}\n")
-        exit(1)
-    if rows2[0].getInt("age") != 35 =>
-        print($"FAIL: expected Carol age 35, got {rows2[0].getInt(\"age\")}\n")
-        exit(1)
-    print("PASS: prepared statement\n")
+  var rows2: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test WHERE name = N'Carol'")
+  if rows2.length != 1 =>
+    print($"FAIL: expected 1 Carol row, got {rows2.length}\n")
+    exit(1)
+  if rows2[0].getInt("age") != 35 =>
+    print($"FAIL: expected Carol age 35, got {rows2[0].getInt(\"age\")}\n")
+    exit(1)
+  print("PASS: prepared statement\n")
 
-    # Test 10: prepared statement reset and re-use
-    var insert: SqlServerStmt = conn.prepare("insert_named", "INSERT INTO sn_sql_test (name, age) VALUES (?, ?)")
-    insert.bindString(1, "Dave").bindInt(2, 40).exec()
-    insert.reset()
-    insert.bindString(1, "Eve").bindInt(2, 28).exec()
-    insert.dispose()
+  # Test 10: prepared statement reset and re-use
+  var insert: SqlServerStmt = conn.prepare("insert_named", "INSERT INTO sn_sql_test (name, age) VALUES (?, ?)")
+  insert.bindString(1, "Dave").bindInt(2, 40).exec()
+  insert.reset()
+  insert.bindString(1, "Eve").bindInt(2, 28).exec()
+  insert.dispose()
 
-    var rows3: SqlServerRow[] = conn.query("SELECT COUNT(*) AS n FROM sn_sql_test")
-    if rows3[0].getInt("n") != 5 =>
-        print($"FAIL: expected 5 total rows, got {rows3[0].getInt(\"n\")}\n")
-        exit(1)
-    print("PASS: prepared statement reuse\n")
+  var rows3: SqlServerRow[] = conn.query("SELECT COUNT(*) AS n FROM sn_sql_test")
+  if rows3[0].getInt("n") != 5 =>
+    print($"FAIL: expected 5 total rows, got {rows3[0].getInt(\"n\")}\n")
+    exit(1)
+  print("PASS: prepared statement reuse\n")
 
-    # Test 11: bindNull
-    var insert2: SqlServerStmt = conn.prepare("insert_null", "INSERT INTO sn_sql_test (name, age, notes) VALUES (?, ?, ?)")
-    insert2.bindString(1, "Frank").bindInt(2, 50).bindNull(3).exec()
-    insert2.dispose()
+  # Test 11: bindNull
+  var insert2: SqlServerStmt = conn.prepare("insert_null", "INSERT INTO sn_sql_test (name, age, notes) VALUES (?, ?, ?)")
+  insert2.bindString(1, "Frank").bindInt(2, 50).bindNull(3).exec()
+  insert2.dispose()
 
-    var rows4: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test WHERE name = N'Frank'")
-    if !rows4[0].isNull("notes") =>
-        print("FAIL: Frank.notes should be NULL after bindNull\n")
-        exit(1)
-    print("PASS: bindNull\n")
+  var rows4: SqlServerRow[] = conn.query("SELECT * FROM sn_sql_test WHERE name = N'Frank'")
+  if !rows4[0].isNull("notes") =>
+    print("FAIL: Frank.notes should be NULL after bindNull\n")
+    exit(1)
+  print("PASS: bindNull\n")
 
-    # Test 12: prepared statement returning rows
-    var sel: SqlServerStmt = conn.prepare("select_by_name", "SELECT name, age FROM sn_sql_test WHERE name = ?")
-    var rows5: SqlServerRow[] = sel.bindString(1, "Alice").query()
-    if rows5.length != 1 =>
-        print($"FAIL: expected 1 row for Alice, got {rows5.length}\n")
-        exit(1)
-    if rows5[0].getInt("age") != 30 =>
-        print($"FAIL: expected Alice age 30, got {rows5[0].getInt(\"age\")}\n")
-        exit(1)
-    sel.dispose()
-    print("PASS: prepared statement query\n")
+  # Test 12: prepared statement returning rows
+  var sel: SqlServerStmt = conn.prepare("select_by_name", "SELECT name, age FROM sn_sql_test WHERE name = ?")
+  var rows5: SqlServerRow[] = sel.bindString(1, "Alice").query()
+  if rows5.length != 1 =>
+    print($"FAIL: expected 1 row for Alice, got {rows5.length}\n")
+    exit(1)
+  if rows5[0].getInt("age") != 30 =>
+    print($"FAIL: expected Alice age 30, got {rows5[0].getInt(\"age\")}\n")
+    exit(1)
+  sel.dispose()
+  print("PASS: prepared statement query\n")
 
-    # Test 13: string with single quotes (SQL injection safety)
-    var insert3: SqlServerStmt = conn.prepare("insert_quote", "INSERT INTO sn_sql_test (name, age) VALUES (?, ?)")
-    insert3.bindString(1, "O'Brien").bindInt(2, 45).exec()
-    insert3.dispose()
+  # Test 13: string with single quotes (SQL injection safety)
+  var insert3: SqlServerStmt = conn.prepare("insert_quote", "INSERT INTO sn_sql_test (name, age) VALUES (?, ?)")
+  insert3.bindString(1, "O'Brien").bindInt(2, 45).exec()
+  insert3.dispose()
 
-    var rows6: SqlServerRow[] = conn.query("SELECT name FROM sn_sql_test WHERE age = 45")
-    if rows6.length != 1 =>
-        print($"FAIL: expected 1 row with age=45, got {rows6.length}\n")
-        exit(1)
-    if rows6[0].getString("name") != "O'Brien" =>
-        print($"FAIL: expected \"O'Brien\", got '{rows6[0].getString(\"name\")}'\n")
-        exit(1)
-    print("PASS: string escaping\n")
+  var rows6: SqlServerRow[] = conn.query("SELECT name FROM sn_sql_test WHERE age = 45")
+  if rows6.length != 1 =>
+    print($"FAIL: expected 1 row with age=45, got {rows6.length}\n")
+    exit(1)
+  if rows6[0].getString("name") != "O'Brien" =>
+    print($"FAIL: expected \"O'Brien\", got '{rows6[0].getString(\"name\")}'\n")
+    exit(1)
+  print("PASS: string escaping\n")
 
-    conn.exec("DROP TABLE sn_sql_test")
-    conn.dispose()
-    print("PASS\n")
+  conn.exec("DROP TABLE sn_sql_test")
+  conn.dispose()
+  print("PASS\n")
