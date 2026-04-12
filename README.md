@@ -235,4 +235,16 @@ FreeTDS (`libsybdb`) must be available on the system. Install via your package m
 
 ## License
 
-MIT License
+This package is licensed under the [MIT License](LICENSE).
+
+### Third-Party Library Notice
+
+This package links [FreeTDS](https://www.freetds.org/) (`libsybdb`), which is licensed under **LGPL 2.0 or later**. Under the terms of the LGPL:
+
+- You may use this package in proprietary applications.
+- If you modify the FreeTDS library itself, you must make the modified source available.
+- Static linking requires that you provide object files sufficient for relinking on request (LGPL 2.0, Section 6).
+
+The FreeTDS source code is available at: https://github.com/FreeTDS/freetds
+
+See [sindarin-pkg-libs/THIRD-PARTY.md](https://github.com/SindarinSDK/sindarin-pkg-libs/blob/main/THIRD-PARTY.md) for the complete list of bundled native library licenses.
