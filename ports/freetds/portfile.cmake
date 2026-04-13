@@ -36,38 +36,33 @@ vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
 
 # 3. FreeTDS always creates both SHARED and STATIC targets for dblib and ctlib,
 #    ignoring BUILD_SHARED_LIBS. The SHARED targets fail when linking against
-#    static OpenSSL. Remove the shared targets and their unittests.
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "add_subdirectory(unittests)"
-    "# add_subdirectory(unittests)"
-)
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "add_library(sybdb SHARED"
-    "add_library(sybdb STATIC"
-)
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)"
-    "# target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)"
-)
+#    static OpenSSL. Comment out the shared targets entirely. Also disable unittests.
 
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "add_subdirectory(unittests)"
-    "# add_subdirectory(unittests)"
-)
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "add_library(ct SHARED"
-    "add_library(ct STATIC"
-)
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "target_compile_definitions(ct PUBLIC DLL_EXPORT=1)"
-    "# target_compile_definitions(ct PUBLIC DLL_EXPORT=1)"
-)
+# dblib: remove shared target (sybdb), keep static (db-lib)
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "add_library(sybdb SHARED" "# add_library(sybdb_shared SHARED  # disabled for static build\n# ")
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)" "# target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)")
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "add_dependencies(sybdb encodings_h)" "# add_dependencies(sybdb encodings_h)")
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "target_link_libraries(sybdb tds" "# target_link_libraries(sybdb tds")
 
-# Disable tds unittests too
+# ctlib: remove shared target (ct), keep static (ct-static)
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "add_library(ct SHARED" "# add_library(ct_shared SHARED  # disabled for static build\n# ")
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "target_compile_definitions(ct PUBLIC DLL_EXPORT=1)" "# target_compile_definitions(ct PUBLIC DLL_EXPORT=1)")
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "target_link_libraries(ct tds" "# target_link_libraries(ct tds")
+
+# tds: disable unittests
 vcpkg_replace_string("${SOURCE_PATH}/src/tds/CMakeLists.txt"
-    "add_subdirectory(unittests)"
-    "# add_subdirectory(unittests)"
-)
+    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
