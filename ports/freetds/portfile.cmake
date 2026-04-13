@@ -25,6 +25,14 @@ vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "# add_subdirectory(src/pool)  # disabled by vcpkg overlay"
 )
 
+# FreeTDS unconditionally links gssapi_krb5 on non-Windows (cmake bug:
+# "# TODO check libraries" in CMakeLists.txt). Patch it out since we
+# disable Kerberos and don't need GSSAPI.
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+    "set(lib_NETWORK gssapi_krb5)"
+    "set(lib_NETWORK)"
+)
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
