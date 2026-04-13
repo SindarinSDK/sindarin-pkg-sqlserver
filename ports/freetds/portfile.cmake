@@ -81,6 +81,7 @@ vcpkg_cmake_configure(
         -DOPENSSL_USE_STATIC_LIBS=ON
         -DENABLE_KRB5=OFF
         -DWITH_OPENSSL=ON
+        -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
 )
 
 vcpkg_cmake_build()
