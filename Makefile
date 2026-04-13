@@ -81,7 +81,7 @@ release-build:
 	    git clone --depth=1 https://github.com/microsoft/vcpkg.git "$(VCPKG_ROOT)" && \
 	    "$(VCPKG_ROOT)/bootstrap-vcpkg.sh" -disableMetrics; \
 	fi
-	$(SN) --install
+	SN_LIBS_ARCH=$(ARCH) $(SN) --install
 	"$(VCPKG_ROOT)/vcpkg" install --triplet=$(TRIPLET) --x-install-root=vcpkg/installed
 	mkdir -p libs/$(PLATFORM)/lib libs/$(PLATFORM)/include
 	find vcpkg/installed/$(TRIPLET)/lib -maxdepth 1 -name "*.a" -exec cp {} libs/$(PLATFORM)/lib/ \;
