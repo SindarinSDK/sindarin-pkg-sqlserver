@@ -6,14 +6,31 @@ vcpkg_from_github(
     HEAD_REF Branch-1_4
 )
 
+# FreeTDS unconditionally builds src/odbc, src/apps, src/server, src/pool
+# which we don't need. Patch the CMakeLists.txt to make them conditional.
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+    "add_subdirectory(src/odbc)"
+    "# add_subdirectory(src/odbc)  # disabled by vcpkg overlay"
+)
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+    "add_subdirectory(src/apps)"
+    "# add_subdirectory(src/apps)  # disabled by vcpkg overlay"
+)
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+    "add_subdirectory(src/server)"
+    "# add_subdirectory(src/server)  # disabled by vcpkg overlay"
+)
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
+    "add_subdirectory(src/pool)"
+    "# add_subdirectory(src/pool)  # disabled by vcpkg overlay"
+)
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         -DBUILD_SHARED_LIBS=OFF
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DOPENSSL_USE_STATIC_LIBS=ON
-        -DENABLE_ODBC=OFF
-        -DBUILD_TESTING=OFF
 )
 
 vcpkg_cmake_build()
