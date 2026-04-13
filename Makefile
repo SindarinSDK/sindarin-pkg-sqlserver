@@ -1,6 +1,6 @@
 # Sindarin SQL Server Package - Makefile
 
-.PHONY: all test hooks build-libs install-libs clean help
+.PHONY: all test hooks release-build install-libs clean help
 
 # Disable implicit rules for .sn.c files (compiled by the Sindarin compiler)
 %.sn: %.sn.c
@@ -65,29 +65,17 @@ $(BIN_DIR):
 $(BIN_DIR)/%$(EXE_EXT): tests/%.sn $(SRC_SOURCES) | $(BIN_DIR)
 	@$(SN) $< -o $@ -l 1
 
-FREETDS_SRC   := /tmp/freetds-src
-FREETDS_BUILD := /tmp/freetds-build
-FREETDS_INST  := /tmp/freetds-install
-
-build-libs:
-	@echo "Building FreeTDS from source for $(PLATFORM)..."
-	@if [ ! -d "$(FREETDS_SRC)" ]; then \
-	    git clone --depth=1 --branch Branch-1_4 https://github.com/FreeTDS/freetds.git $(FREETDS_SRC); \
-	fi
-	@cmake -S $(FREETDS_SRC) -B $(FREETDS_BUILD) \
-	    -G Ninja \
-	    -DCMAKE_BUILD_TYPE=Release \
-	    -DCMAKE_INSTALL_PREFIX=$(FREETDS_INST) \
-	    -DBUILD_SHARED_LIBS=OFF \
-	    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-	    -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
-	    -DENABLE_ODBC=OFF
-	@cmake --build $(FREETDS_BUILD) -j
-	@cmake --install $(FREETDS_BUILD)
-	@cmake -S . -B build/package \
-	    -DFREETDS_INSTALL_PREFIX=$(FREETDS_INST)
-	@cmake --build build/package
-	@echo "Libraries built in libs/$(PLATFORM)/"
+#------------------------------------------------------------------------------
+# Release build (called by sindarin-pipelines/sindarin-lib-release.yml)
+# Env: VCPKG_ROOT, TRIPLET, PLATFORM, ARCH, VERSION
+#------------------------------------------------------------------------------
+release-build:
+	"$(VCPKG_ROOT)/vcpkg" install --triplet=$(TRIPLET) --x-install-root=vcpkg/installed
+	mkdir -p libs/$(PLATFORM)/lib libs/$(PLATFORM)/include
+	find vcpkg/installed/$(TRIPLET)/lib -maxdepth 1 -name "*.a" -exec cp {} libs/$(PLATFORM)/lib/ \;
+	cp -r vcpkg/installed/$(TRIPLET)/include/* libs/$(PLATFORM)/include/
+	echo "$(VERSION)" > libs/$(PLATFORM)/VERSION
+	echo "$(PLATFORM)" > libs/$(PLATFORM)/PLATFORM
 
 install-libs:
 	@bash scripts/install.sh
