@@ -22,6 +22,11 @@ string(REPLACE "add_subdirectory(src/odbc)" "# add_subdirectory(src/odbc)" _root
 string(REPLACE "add_subdirectory(src/apps)" "# add_subdirectory(src/apps)" _root_cmake "${_root_cmake}")
 string(REPLACE "add_subdirectory(src/server)" "# add_subdirectory(src/server)" _root_cmake "${_root_cmake}")
 string(REPLACE "add_subdirectory(src/pool)" "# add_subdirectory(src/pool)" _root_cmake "${_root_cmake}")
+# Remove stray configure_file for odbc version.rc (fails on CI — src/odbc is disabled)
+string(REPLACE
+    "configure_file(\${CMAKE_SOURCE_DIR}/src/odbc/version.rc.in \${CMAKE_SOURCE_DIR}/src/odbc/version.rc)"
+    "# configure_file(\${CMAKE_SOURCE_DIR}/src/odbc/version.rc.in \${CMAKE_SOURCE_DIR}/src/odbc/version.rc)"
+    _root_cmake "${_root_cmake}")
 file(WRITE "${SOURCE_PATH}/CMakeLists.txt" "${_root_cmake}")
 
 # Rewrite dblib/CMakeLists.txt: static only, no unittests
