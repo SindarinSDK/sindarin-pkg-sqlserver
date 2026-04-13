@@ -20,3 +20,6 @@ jobs:
     secrets: inherit
     with:
       package-name: sindarin-sqlserver
+      apt-packages: "gperf"
+      brew-packages: "gperf"
+      choco-packages: "gperf"
