@@ -82,6 +82,7 @@ vcpkg_cmake_configure(
         -DENABLE_KRB5=OFF
         -DWITH_OPENSSL=ON
         -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
+        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
 )
 
 vcpkg_cmake_build()
