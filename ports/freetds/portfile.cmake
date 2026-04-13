@@ -6,63 +6,72 @@ vcpkg_from_github(
     HEAD_REF Branch-1_4
 )
 
-# ---- Patches for FreeTDS cmake bugs ----
+# ---- Fix FreeTDS cmake for static-only builds ----
+# FreeTDS has several cmake bugs that prevent clean static builds:
+# 1. Unconditionally links gssapi_krb5 on non-Windows
+# 2. Always builds src/odbc, src/apps, src/server, src/pool
+# 3. Always creates SHARED targets alongside STATIC (breaks with static OpenSSL)
+# 4. Always builds unittests
+#
+# We fix these by rewriting the affected CMakeLists.txt files.
 
-# 1. Disable subdirectories we don't need (odbc, apps, server, pool).
-#    FreeTDS builds these unconditionally.
-vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
-    "add_subdirectory(src/odbc)"
-    "# add_subdirectory(src/odbc)"
+# Fix root CMakeLists.txt: remove gssapi_krb5 and unwanted subdirectories
+file(READ "${SOURCE_PATH}/CMakeLists.txt" _root_cmake)
+string(REPLACE "set(lib_NETWORK gssapi_krb5)" "set(lib_NETWORK)" _root_cmake "${_root_cmake}")
+string(REPLACE "add_subdirectory(src/odbc)" "# add_subdirectory(src/odbc)" _root_cmake "${_root_cmake}")
+string(REPLACE "add_subdirectory(src/apps)" "# add_subdirectory(src/apps)" _root_cmake "${_root_cmake}")
+string(REPLACE "add_subdirectory(src/server)" "# add_subdirectory(src/server)" _root_cmake "${_root_cmake}")
+string(REPLACE "add_subdirectory(src/pool)" "# add_subdirectory(src/pool)" _root_cmake "${_root_cmake}")
+file(WRITE "${SOURCE_PATH}/CMakeLists.txt" "${_root_cmake}")
+
+# Rewrite dblib/CMakeLists.txt: static only, no unittests
+file(WRITE "${SOURCE_PATH}/src/dblib/CMakeLists.txt" [=[
+if(WIN32)
+    set(win_SRCS winmain.c dblib.def dbopen.c)
+endif()
+
+add_library(db-lib STATIC
+    dblib.c dbutil.c rpc.c bcp.c xact.c dbpivot.c buffering.h
+    ${win_SRCS}
 )
-vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
-    "add_subdirectory(src/apps)"
-    "# add_subdirectory(src/apps)"
+add_dependencies(db-lib encodings_h)
+target_link_libraries(db-lib tds replacements tdsutils ${lib_NETWORK} ${lib_BASE})
+
+INSTALL(TARGETS db-lib
+    PUBLIC_HEADER DESTINATION include
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
-vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
-    "add_subdirectory(src/server)"
-    "# add_subdirectory(src/server)"
+]=])
+
+# Rewrite ctlib/CMakeLists.txt: static only, no unittests
+file(WRITE "${SOURCE_PATH}/src/ctlib/CMakeLists.txt" [=[
+set(static_lib_name ct)
+if(WIN32)
+    set(win_SRCS winmain.c ctlib.def)
+    set(static_lib_name libct)
+endif()
+
+add_library(ct-static STATIC
+    ct.c cs.c blk.c ctutil.c
+    ${win_SRCS}
 )
-vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
-    "add_subdirectory(src/pool)"
-    "# add_subdirectory(src/pool)"
+SET_TARGET_PROPERTIES(ct-static PROPERTIES OUTPUT_NAME ${static_lib_name})
+target_link_libraries(ct-static tds replacements tdsutils ${lib_NETWORK} ${lib_BASE})
+
+INSTALL(TARGETS ct-static
+    PUBLIC_HEADER DESTINATION include
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
+]=])
 
-# 2. Remove unconditional gssapi_krb5 linkage on non-Windows.
-#    FreeTDS has a "# TODO check libraries" comment — it never checks.
-vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
-    "set(lib_NETWORK gssapi_krb5)"
-    "set(lib_NETWORK)"
-)
-
-# 3. FreeTDS always creates both SHARED and STATIC targets for dblib and ctlib,
-#    ignoring BUILD_SHARED_LIBS. The SHARED targets fail when linking against
-#    static OpenSSL. Comment out the shared targets entirely. Also disable unittests.
-
-# dblib: remove shared target (sybdb), keep static (db-lib)
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "add_library(sybdb SHARED" "# add_library(sybdb_shared SHARED  # disabled for static build\n# ")
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)" "# target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)")
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "add_dependencies(sybdb encodings_h)" "# add_dependencies(sybdb encodings_h)")
-vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
-    "target_link_libraries(sybdb tds" "# target_link_libraries(sybdb tds")
-
-# ctlib: remove shared target (ct), keep static (ct-static)
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "add_library(ct SHARED" "# add_library(ct_shared SHARED  # disabled for static build\n# ")
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "target_compile_definitions(ct PUBLIC DLL_EXPORT=1)" "# target_compile_definitions(ct PUBLIC DLL_EXPORT=1)")
-vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
-    "target_link_libraries(ct tds" "# target_link_libraries(ct tds")
-
-# tds: disable unittests
-vcpkg_replace_string("${SOURCE_PATH}/src/tds/CMakeLists.txt"
-    "add_subdirectory(unittests)" "# add_subdirectory(unittests)")
+# Rewrite tds/CMakeLists.txt: remove unittests reference
+file(READ "${SOURCE_PATH}/src/tds/CMakeLists.txt" _tds_cmake)
+string(REPLACE "add_subdirectory(unittests)" "# add_subdirectory(unittests)" _tds_cmake "${_tds_cmake}")
+file(WRITE "${SOURCE_PATH}/src/tds/CMakeLists.txt" "${_tds_cmake}")
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
@@ -81,6 +90,6 @@ vcpkg_fixup_pkgconfig()
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
 
-file(INSTALL "${SOURCE_PATH}/COPYING.LIB"
+file(INSTALL "${SOURCE_PATH}/COPYING_LIB.txt"
      DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}"
      RENAME copyright)
