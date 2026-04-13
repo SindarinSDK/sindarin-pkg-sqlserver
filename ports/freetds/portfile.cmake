@@ -6,31 +6,67 @@ vcpkg_from_github(
     HEAD_REF Branch-1_4
 )
 
-# FreeTDS unconditionally builds src/odbc, src/apps, src/server, src/pool
-# which we don't need. Patch the CMakeLists.txt to make them conditional.
+# ---- Patches for FreeTDS cmake bugs ----
+
+# 1. Disable subdirectories we don't need (odbc, apps, server, pool).
+#    FreeTDS builds these unconditionally.
 vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "add_subdirectory(src/odbc)"
-    "# add_subdirectory(src/odbc)  # disabled by vcpkg overlay"
+    "# add_subdirectory(src/odbc)"
 )
 vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "add_subdirectory(src/apps)"
-    "# add_subdirectory(src/apps)  # disabled by vcpkg overlay"
+    "# add_subdirectory(src/apps)"
 )
 vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "add_subdirectory(src/server)"
-    "# add_subdirectory(src/server)  # disabled by vcpkg overlay"
+    "# add_subdirectory(src/server)"
 )
 vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "add_subdirectory(src/pool)"
-    "# add_subdirectory(src/pool)  # disabled by vcpkg overlay"
+    "# add_subdirectory(src/pool)"
 )
 
-# FreeTDS unconditionally links gssapi_krb5 on non-Windows (cmake bug:
-# "# TODO check libraries" in CMakeLists.txt). Patch it out since we
-# disable Kerberos and don't need GSSAPI.
+# 2. Remove unconditional gssapi_krb5 linkage on non-Windows.
+#    FreeTDS has a "# TODO check libraries" comment — it never checks.
 vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt"
     "set(lib_NETWORK gssapi_krb5)"
     "set(lib_NETWORK)"
+)
+
+# 3. FreeTDS always creates both SHARED and STATIC targets for dblib and ctlib,
+#    ignoring BUILD_SHARED_LIBS. The SHARED targets fail when linking against
+#    static OpenSSL. Remove the shared targets and their unittests.
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "add_subdirectory(unittests)"
+    "# add_subdirectory(unittests)"
+)
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "add_library(sybdb SHARED"
+    "add_library(sybdb STATIC"
+)
+vcpkg_replace_string("${SOURCE_PATH}/src/dblib/CMakeLists.txt"
+    "target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)"
+    "# target_compile_definitions(sybdb PUBLIC DLL_EXPORT=1)"
+)
+
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "add_subdirectory(unittests)"
+    "# add_subdirectory(unittests)"
+)
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "add_library(ct SHARED"
+    "add_library(ct STATIC"
+)
+vcpkg_replace_string("${SOURCE_PATH}/src/ctlib/CMakeLists.txt"
+    "target_compile_definitions(ct PUBLIC DLL_EXPORT=1)"
+    "# target_compile_definitions(ct PUBLIC DLL_EXPORT=1)"
+)
+
+# Disable tds unittests too
+vcpkg_replace_string("${SOURCE_PATH}/src/tds/CMakeLists.txt"
+    "add_subdirectory(unittests)"
+    "# add_subdirectory(unittests)"
 )
 
 vcpkg_cmake_configure(
