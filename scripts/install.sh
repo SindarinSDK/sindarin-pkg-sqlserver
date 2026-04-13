@@ -1,10 +1,12 @@
 #!/bin/bash
-# Sindarin SQL Server Libraries Installer for Linux/macOS
-# Downloads and extracts the latest sindarin-pkg-sqlserver libs to ./libs/{os}
+# Sindarin native library installer for Linux/macOS
+# Downloads the latest release from GitHub to ./libs/{os}
+# Caches archives in ~/.sn-cache/downloads/ to avoid re-downloading
 
 set -e
 
 REPO="SindarinSDK/sindarin-pkg-sqlserver"
+PKG_NAME="sindarin-sqlserver"
 BASE_DIR="$(pwd)/libs"
 
 # Colors for output
@@ -120,7 +122,6 @@ download_file() {
 
 get_latest_release() {
     local os="$1"
-    local arch="$2"
     local api_url="https://api.github.com/repos/${REPO}/releases/latest"
 
     write_status "Fetching latest release information..."
@@ -138,12 +139,13 @@ get_latest_release() {
     version=$(echo "$release_info" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
 
     # Find the appropriate asset URL based on OS and arch
+    local arch="$2"
     local asset_pattern="${os}-${arch}.tar.gz"
     local download_url
     download_url=$(echo "$release_info" | grep '"browser_download_url"' | grep "$asset_pattern" | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
 
     if [ -z "$download_url" ]; then
-        write_status "No release asset found for $os-$arch" "error"
+        write_status "No release asset found for $os" "error"
         exit 1
     fi
 
@@ -157,7 +159,6 @@ install_libs() {
     local version="${release_info%%|*}"
     local download_url="${release_info#*|}"
 
-    # Derive filename from download URL
     local archive_name
     archive_name=$(basename "$download_url")
 
@@ -168,7 +169,7 @@ install_libs() {
     if [ -f "$cached_archive" ]; then
         write_status "Using cached ${archive_name}"
     else
-        write_status "Downloading sindarin-sqlserver ${version} for ${os}..."
+        write_status "Downloading ${PKG_NAME} ${version} for ${os}..."
         mkdir -p "$cache_dir"
         if ! download_file "$download_url" "$cached_archive"; then
             write_status "Download failed" "error"
@@ -177,20 +178,17 @@ install_libs() {
         fi
     fi
 
-    # Create temp directory for extraction
     local temp_dir
     temp_dir=$(mktemp -d)
     trap "rm -rf '$temp_dir'" EXIT
 
     write_status "Extracting to ${INSTALL_DIR}..."
 
-    # Create or clean install directory
     if [ -d "$INSTALL_DIR" ]; then
         rm -rf "$INSTALL_DIR"
     fi
     mkdir -p "$INSTALL_DIR"
 
-    # Extract the archive from cache
     local extract_dir="${temp_dir}/extracted"
     mkdir -p "$extract_dir"
     tar -xzf "$cached_archive" -C "$extract_dir"
@@ -202,21 +200,19 @@ install_libs() {
     count=$(echo "$contents" | wc -l)
 
     if [ "$count" -eq 1 ] && [ -d "${extract_dir}/${contents}" ]; then
-        # Single directory inside - move its contents
         mv "${extract_dir}/${contents}"/* "$INSTALL_DIR/" 2>/dev/null || true
         mv "${extract_dir}/${contents}"/.[!.]* "$INSTALL_DIR/" 2>/dev/null || true
     else
-        # Multiple items - move them all
         mv "${extract_dir}"/* "$INSTALL_DIR/" 2>/dev/null || true
         mv "${extract_dir}"/.[!.]* "$INSTALL_DIR/" 2>/dev/null || true
     fi
 
-    write_status "Successfully installed sindarin-sqlserver ${version} to ${INSTALL_DIR}" "success"
+    write_status "Successfully installed ${PKG_NAME} ${version} to ${INSTALL_DIR}" "success"
 }
 
 # Main execution
 main() {
-    write_status "Sindarin SQL Server Libraries Installer"
+    write_status "${PKG_NAME} — native library installer"
     write_status "========================================"
 
     local os

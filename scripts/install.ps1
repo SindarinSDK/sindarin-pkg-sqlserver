@@ -1,9 +1,11 @@
-# Sindarin SQL Server Libraries Installer for Windows
-# Downloads and extracts the latest sindarin-pkg-sqlserver libs to ./libs/windows
+# Sindarin native library installer for Windows
+# Downloads the latest release from GitHub to ./libs/windows
+# Caches archives in ~/.sn-cache/downloads/ to avoid re-downloading
 
 $ErrorActionPreference = "Stop"
 
 $REPO = "SindarinSDK/sindarin-pkg-sqlserver"
+$PKG_NAME = "sindarin-sqlserver"
 $INSTALL_DIR = Join-Path (Get-Location) "libs\windows"
 
 function Write-Status {
@@ -23,18 +25,32 @@ function Write-Status {
     Write-Host $Message -ForegroundColor $color
 }
 
+function Get-Architecture {
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    switch ($arch) {
+        "X64"   { return "x64" }
+        "Arm64" { return "arm64" }
+        default { throw "Unsupported architecture: $arch" }
+    }
+}
+
 function Get-LatestWindowsRelease {
+    param([string]$Arch)
+
     Write-Status "Fetching latest release information..."
 
     $apiUrl = "https://api.github.com/repos/$REPO/releases/latest"
+    $headers = @{ "User-Agent" = "sindarin-installer" }
+    if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
 
     try {
-        $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ "User-Agent" = "sindarin-installer" }
+        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers
 
-        $asset = $release.assets | Where-Object { $_.name -like "*windows-x64*.zip" } | Select-Object -First 1
+        $pattern = "windows-$Arch.zip"
+        $asset = $release.assets | Where-Object { $_.name -like "*$pattern*" } | Select-Object -First 1
 
         if (-not $asset) {
-            throw "No Windows release asset found"
+            throw "No Windows release asset found for windows-$Arch"
         }
 
         return @{
@@ -49,27 +65,29 @@ function Get-LatestWindowsRelease {
     }
 }
 
-function Install-SqlServerLibs {
+function Install-SindarinLibs {
     param(
         [hashtable]$Release
     )
 
     # Check package cache first
-    $cacheDir = Join-Path (Join-Path $HOME ".sn-cache") "downloads"
+    $cacheDir = Join-Path $env:USERPROFILE ".sn-cache" "downloads"
     $cachedZip = Join-Path $cacheDir $Release.Name
 
     if (Test-Path $cachedZip) {
         Write-Status "Using cached $($Release.Name)"
     }
     else {
-        Write-Status "Downloading $($Release.Name)..."
+        Write-Status "Downloading $PKG_NAME $($Release.Version)..."
 
         if (-not (Test-Path $cacheDir)) {
-            New-Item -ItemType Directory -Path $cacheDir | Out-Null
+            New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
         }
 
         try {
-            Invoke-WebRequest -Uri $Release.Url -OutFile $cachedZip -UseBasicParsing
+            $dlHeaders = @{ "User-Agent" = "sindarin-installer" }
+            if ($env:GITHUB_TOKEN) { $dlHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+            Invoke-WebRequest -Uri $Release.Url -OutFile $cachedZip -Headers $dlHeaders -UseBasicParsing
         }
         catch {
             Write-Status "Download failed: $_" -Type "Error"
@@ -80,7 +98,7 @@ function Install-SqlServerLibs {
         }
     }
 
-    $tempDir = Join-Path $env:TEMP "sindarin-sqlserver-install"
+    $tempDir = Join-Path $env:TEMP "$PKG_NAME-install"
 
     if (Test-Path $tempDir) {
         Remove-Item -Recurse -Force $tempDir
@@ -98,6 +116,7 @@ function Install-SqlServerLibs {
         $extractDir = Join-Path $tempDir "extracted"
         Expand-Archive -Path $cachedZip -DestinationPath $extractDir -Force
 
+        # Handle potentially nested directory structure
         $contents = Get-ChildItem -Path $extractDir
         if ($contents.Count -eq 1 -and $contents[0].PSIsContainer) {
             $innerDir = $contents[0].FullName
@@ -107,7 +126,7 @@ function Install-SqlServerLibs {
             Get-ChildItem -Path $extractDir | Move-Item -Destination $INSTALL_DIR
         }
 
-        Write-Status "Successfully installed sindarin-sqlserver $($Release.Version) to $INSTALL_DIR" -Type "Success"
+        Write-Status "Successfully installed $PKG_NAME $($Release.Version) to $INSTALL_DIR" -Type "Success"
     }
     catch {
         Write-Status "Installation failed: $_" -Type "Error"
@@ -121,11 +140,14 @@ function Install-SqlServerLibs {
 }
 
 # Main execution
-Write-Status "Sindarin SQL Server Libraries Installer" -Type "Info"
+Write-Status "$PKG_NAME - native library installer" -Type "Info"
 Write-Status "========================================" -Type "Info"
 
-$release = Get-LatestWindowsRelease
-Install-SqlServerLibs -Release $release
+$arch = Get-Architecture
+Write-Status "Detected: windows ($arch)" -Type "Info"
+
+$release = Get-LatestWindowsRelease -Arch $arch
+Install-SindarinLibs -Release $release
 
 Write-Status ""
 Write-Status "Installation complete!" -Type "Success"
