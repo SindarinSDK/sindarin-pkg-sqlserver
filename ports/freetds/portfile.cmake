@@ -73,6 +73,14 @@ file(READ "${SOURCE_PATH}/src/tds/CMakeLists.txt" _tds_cmake)
 string(REPLACE "add_subdirectory(unittests)" "# add_subdirectory(unittests)" _tds_cmake "${_tds_cmake}")
 file(WRITE "${SOURCE_PATH}/src/tds/CMakeLists.txt" "${_tds_cmake}")
 
+set(_freetds_extra_opts "")
+if(VCPKG_TARGET_IS_OSX)
+    # macOS cross-compilation (x64 on arm64 runner) fails cmake try-run checks.
+    # STATIC_LIBRARY avoids running test executables during configuration.
+    list(APPEND _freetds_extra_opts -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY)
+    list(APPEND _freetds_extra_opts -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration)
+endif()
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
@@ -81,8 +89,7 @@ vcpkg_cmake_configure(
         -DOPENSSL_USE_STATIC_LIBS=ON
         -DENABLE_KRB5=OFF
         -DWITH_OPENSSL=ON
-        -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
-        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+        ${_freetds_extra_opts}
 )
 
 vcpkg_cmake_build()
