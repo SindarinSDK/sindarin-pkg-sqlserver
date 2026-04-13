@@ -35,14 +35,14 @@ if(WIN32)
     set(win_SRCS winmain.c dblib.def dbopen.c)
 endif()
 
-add_library(db-lib STATIC
+add_library(sybdb STATIC
     dblib.c dbutil.c rpc.c bcp.c xact.c dbpivot.c buffering.h
     ${win_SRCS}
 )
-add_dependencies(db-lib encodings_h)
-target_link_libraries(db-lib tds replacements tdsutils ${lib_NETWORK} ${lib_BASE})
+add_dependencies(sybdb encodings_h)
+target_link_libraries(sybdb tds replacements tdsutils ${lib_NETWORK} ${lib_BASE})
 
-INSTALL(TARGETS db-lib
+INSTALL(TARGETS sybdb
     PUBLIC_HEADER DESTINATION include
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib

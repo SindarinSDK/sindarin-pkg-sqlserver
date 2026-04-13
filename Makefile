@@ -1,18 +1,13 @@
-# Sindarin SQL Server Package - Makefile
+# Sindarin SQL Server Package
 
-.PHONY: all test hooks release-build install-libs clean help
+.PHONY: setup test build teardown
 
-# Disable implicit rules for .sn.c files (compiled by the Sindarin compiler)
 %.sn: %.sn.c
 	@:
 
-#------------------------------------------------------------------------------
-# Platform Detection
-#------------------------------------------------------------------------------
 ifeq ($(OS),Windows_NT)
     PLATFORM := windows
     EXE_EXT  := .exe
-    MKDIR    := mkdir
 else
     UNAME_S := $(shell uname -s 2>/dev/null || echo Unknown)
     ifeq ($(UNAME_S),Darwin)
@@ -21,63 +16,48 @@ else
         PLATFORM := linux
     endif
     EXE_EXT :=
-    MKDIR   := mkdir -p
 endif
 
-#------------------------------------------------------------------------------
-# Configuration
-#------------------------------------------------------------------------------
-BIN_DIR := bin
-SN      ?= sn
+BIN_DIR      := bin
+SN           ?= sn
+SRC_SOURCES  := $(wildcard src/*.sn) $(wildcard src/*.sn.c)
+RUN_TESTS_SN := .sn/sindarin-pkg-test/src/execute.sn
+RUN_TESTS    := $(BIN_DIR)/run_tests$(EXE_EXT)
 
-SRC_SOURCES := $(wildcard src/*.sn) $(wildcard src/*.sn.c)
+setup:
+	@$(SN) --install
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/install.ps1
+else
+	@bash scripts/install.sh
+endif
+	@docker compose up -d --wait
 
-TEST_SRCS := $(wildcard tests/test_*.sn)
-TEST_BINS := $(patsubst tests/%.sn,$(BIN_DIR)/%$(EXE_EXT),$(TEST_SRCS))
+test: setup $(RUN_TESTS)
+	@MSSQL_HOST=localhost MSSQL_PORT=1433 MSSQL_DATABASE=master MSSQL_USER=SA MSSQL_PASSWORD='YourStr0ngPass!' \
+	 SN_CFLAGS="-I$(CURDIR)/libs/$(PLATFORM)/include $(SN_CFLAGS)" \
+	 SN_LDFLAGS="-L$(CURDIR)/libs/$(PLATFORM)/lib $(SN_LDFLAGS)" \
+	 $(RUN_TESTS) --verbose
 
-#------------------------------------------------------------------------------
-# Targets
-#------------------------------------------------------------------------------
-all: test
-
-test: hooks $(TEST_BINS)
-	@echo "Running tests..."
-	@failed=0; \
-	for t in $(TEST_BINS); do \
-	    printf "  %-50s" "$$t"; \
-	    if $$t; then \
-	        echo "PASS"; \
-	    else \
-	        echo "FAIL"; \
-	        failed=1; \
-	    fi; \
-	done; \
-	if [ $$failed -eq 0 ]; then \
-	    echo "All tests passed."; \
-	else \
-	    echo "Some tests failed."; \
-	    exit 1; \
-	fi
+teardown:
+	@docker compose down
 
 $(BIN_DIR):
-	@$(MKDIR) $(BIN_DIR)
+	@mkdir -p $(BIN_DIR)
 
-$(BIN_DIR)/%$(EXE_EXT): tests/%.sn $(SRC_SOURCES) | $(BIN_DIR)
-	@$(SN) $< -o $@ -l 1
+$(RUN_TESTS): $(RUN_TESTS_SN) $(SRC_SOURCES) | $(BIN_DIR)
+	@SN_CFLAGS="-I$(CURDIR)/libs/$(PLATFORM)/include $(SN_CFLAGS)" \
+	 SN_LDFLAGS="-L$(CURDIR)/libs/$(PLATFORM)/lib $(SN_LDFLAGS)" \
+	 $(SN) $(RUN_TESTS_SN) -o $@ -l 1
 
-#------------------------------------------------------------------------------
-# Release build (called by sindarin-pipelines/sindarin-lib-release.yml)
-# Env (from CI): VCPKG_ROOT, TRIPLET, PLATFORM, ARCH, VERSION
-# Defaults (for local builds): auto-detected from platform
-#------------------------------------------------------------------------------
 VCPKG_ROOT ?= $(CURDIR)/vcpkg
 TRIPLET    ?= $(if $(filter windows,$(PLATFORM)),x64-mingw-static,$(if $(filter aarch64,$(shell uname -m 2>/dev/null)),arm64,x64)-$(if $(filter darwin,$(PLATFORM)),osx,linux))
 ARCH       ?= $(if $(filter aarch64,$(shell uname -m 2>/dev/null)),arm64,x64)
 VERSION    ?= local
 
-release-build:
+build:
 	@if [ ! -x "$(VCPKG_ROOT)/vcpkg" ] && [ ! -x "$(VCPKG_ROOT)/vcpkg.exe" ]; then \
-	    echo "Bootstrapping vcpkg into $(VCPKG_ROOT)..." && \
+	    echo "Bootstrapping vcpkg..." && \
 	    git clone --depth=1 https://github.com/microsoft/vcpkg.git "$(VCPKG_ROOT)" && \
 	    "$(VCPKG_ROOT)/bootstrap-vcpkg.sh" -disableMetrics; \
 	fi
@@ -88,29 +68,3 @@ release-build:
 	cp -r vcpkg/installed/$(TRIPLET)/include/* libs/$(PLATFORM)/include/
 	echo "$(VERSION)" > libs/$(PLATFORM)/VERSION
 	echo "$(PLATFORM)" > libs/$(PLATFORM)/PLATFORM
-
-install-libs:
-	@bash scripts/install.sh
-
-clean:
-	@echo "Cleaning build artifacts..."
-	@rm -rf $(BIN_DIR) .sn
-	@echo "Clean complete."
-
-#------------------------------------------------------------------------------
-# hooks - Configure git to use tracked pre-commit hooks
-#------------------------------------------------------------------------------
-hooks:
-	@git config core.hooksPath .githooks 2>/dev/null || true
-
-help:
-	@echo "Sindarin SQL Server Package"
-	@echo ""
-	@echo "Targets:"
-	@echo "  make test          Build and run all tests"
-	@echo "  make release-build Build native libraries via vcpkg"
-	@echo "  make install-libs  Download pre-built libraries from GitHub releases"
-	@echo "  make clean         Remove build artifacts"
-	@echo "  make help          Show this help"
-	@echo ""
-	@echo "Platform: $(PLATFORM)"
