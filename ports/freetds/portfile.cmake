@@ -31,6 +31,8 @@ vcpkg_cmake_configure(
         -DBUILD_SHARED_LIBS=OFF
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DOPENSSL_USE_STATIC_LIBS=ON
+        -DENABLE_KRB5=OFF
+        -DWITH_OPENSSL=ON
 )
 
 vcpkg_cmake_build()
