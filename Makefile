@@ -24,6 +24,20 @@ SRC_SOURCES  := $(wildcard src/*.sn) $(wildcard src/*.sn.c)
 RUN_TESTS_SN := .sn/sindarin-pkg-test/src/execute.sn
 RUN_TESTS    := $(BIN_DIR)/run_tests$(EXE_EXT)
 
+# Export compiler flags so child processes see them (avoids POSIX-only inline VAR=val syntax)
+SN_CFLAGS  := -I$(CURDIR)/libs/$(PLATFORM)/include $(SN_CFLAGS)
+SN_LDFLAGS := -L$(CURDIR)/libs/$(PLATFORM)/lib $(SN_LDFLAGS)
+export SN_CFLAGS
+export SN_LDFLAGS
+
+# Test database settings (overridable via environment)
+MSSQL_HOST     ?= localhost
+MSSQL_PORT     ?= 1433
+MSSQL_DATABASE ?= master
+MSSQL_USER     ?= SA
+MSSQL_PASSWORD ?= YourStr0ngPass!
+export MSSQL_HOST MSSQL_PORT MSSQL_DATABASE MSSQL_USER MSSQL_PASSWORD
+
 setup:
 	@$(SN) --install
 ifeq ($(OS),Windows_NT)
@@ -34,10 +48,7 @@ endif
 	@docker compose up -d --wait
 
 test: setup $(RUN_TESTS)
-	@MSSQL_HOST=localhost MSSQL_PORT=1433 MSSQL_DATABASE=master MSSQL_USER=SA MSSQL_PASSWORD='YourStr0ngPass!' \
-	 SN_CFLAGS="-I$(CURDIR)/libs/$(PLATFORM)/include $(SN_CFLAGS)" \
-	 SN_LDFLAGS="-L$(CURDIR)/libs/$(PLATFORM)/lib $(SN_LDFLAGS)" \
-	 $(RUN_TESTS) --verbose
+	@$(RUN_TESTS) --verbose
 
 teardown:
 	@docker compose down
@@ -46,9 +57,7 @@ $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
 $(RUN_TESTS): $(RUN_TESTS_SN) $(SRC_SOURCES) | $(BIN_DIR)
-	@SN_CFLAGS="-I$(CURDIR)/libs/$(PLATFORM)/include $(SN_CFLAGS)" \
-	 SN_LDFLAGS="-L$(CURDIR)/libs/$(PLATFORM)/lib $(SN_LDFLAGS)" \
-	 $(SN) $(RUN_TESTS_SN) -o $@ -l 1
+	@$(SN) $(RUN_TESTS_SN) -o $@ -l 1
 
 VCPKG_ROOT ?= $(CURDIR)/vcpkg
 TRIPLET    ?= $(if $(filter windows,$(PLATFORM)),x64-mingw-static,$(if $(filter aarch64,$(shell uname -m 2>/dev/null)),arm64,x64)-$(if $(filter darwin,$(PLATFORM)),osx,linux))
