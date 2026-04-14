@@ -53,6 +53,11 @@
 
 @include <sybdb.h>
 @link sybdb
+@link tds
+@link tdsutils
+@link replacements
+@link ssl
+@link crypto
 @source "sqlserver.sn.c"
 
 # ==============================================================================

@@ -73,10 +73,17 @@ INSTALL(TARGETS ct-static
 )
 ]=])
 
-# Rewrite tds/CMakeLists.txt: remove unittests reference
+# Rewrite tds/CMakeLists.txt: remove unittests reference and install the static lib
 file(READ "${SOURCE_PATH}/src/tds/CMakeLists.txt" _tds_cmake)
 string(REPLACE "add_subdirectory(unittests)" "# add_subdirectory(unittests)" _tds_cmake "${_tds_cmake}")
 file(WRITE "${SOURCE_PATH}/src/tds/CMakeLists.txt" "${_tds_cmake}")
+file(APPEND "${SOURCE_PATH}/src/tds/CMakeLists.txt" "\nINSTALL(TARGETS tds ARCHIVE DESTINATION lib)\n")
+
+# Rewrite utils/CMakeLists.txt: remove unittests reference and install the static lib
+file(READ "${SOURCE_PATH}/src/utils/CMakeLists.txt" _utils_cmake)
+string(REPLACE "add_subdirectory(unittests)" "# add_subdirectory(unittests)" _utils_cmake "${_utils_cmake}")
+file(WRITE "${SOURCE_PATH}/src/utils/CMakeLists.txt" "${_utils_cmake}")
+file(APPEND "${SOURCE_PATH}/src/utils/CMakeLists.txt" "\nINSTALL(TARGETS tdsutils ARCHIVE DESTINATION lib)\n")
 
 set(_freetds_extra_opts "")
 if(VCPKG_TARGET_IS_OSX)
